@@ -1,3 +1,5 @@
+Cesium.BingMapsApi.defaultKey = "AmsUN3rpnZqwZnpvigSSuP0Xox53w8lgonqh8pORPGtD5R1qMrwnzotPwzr5eUVq";
+
 var viewer = new Cesium.Viewer('cesiumContainer', {
     // Set the clock to loop over the duration of the August 21, 2017 eclipse
     clock: new Cesium.Clock({
