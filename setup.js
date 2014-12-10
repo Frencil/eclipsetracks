@@ -7,9 +7,7 @@ var viewer = new Cesium.Viewer('cesiumContainer');
 // Load 2017-08-21 eclipse track data
 var czmlDataSource = new Cesium.CzmlDataSource();
 czmlDataSource.loadUrl('data/2017-08-21.czml');
-console.log(czmlDataSource);
 viewer.dataSources.add(czmlDataSource);
-
 
 /*
 
