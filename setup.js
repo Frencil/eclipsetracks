@@ -1,4 +1,17 @@
+// Define API key
 Cesium.BingMapsApi.defaultKey = "AmsUN3rpnZqwZnpvigSSuP0Xox53w8lgonqh8pORPGtD5R1qMrwnzotPwzr5eUVq";
+
+// Top-level var for working with the Cesium viewer
+var viewer = new Cesium.Viewer('cesiumContainer');
+
+// Load 2017-08-21 eclipse track data
+var czmlDataSource = new Cesium.CzmlDataSource();
+czmlDataSource.loadUrl('data/2017-08-21.czml');
+console.log(czmlDataSource);
+viewer.dataSources.add(czmlDataSource);
+
+
+/*
 
 // CSV of eclipse track data from here: http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Aug21Tpath.html
 // Data set truncated to only include lat/lon values for northern/southern limits and central line of the track,
@@ -8,12 +21,14 @@ var eclipseTrackCSV = 'Time,NorthLimitLat,NorthLimitLon,SouthLimitLat,SouthLimit
 
 // Convert the CSV-formatted string for all eclipse track times and waypoints to an
 // object that structures the data such that it can be easily passed into API methods
+console.log("waypoints:");
 var eclipseTracks = {
     'csvData': [],
     'northPositions': [],
     'southPositions': [],
     'centralPositions': []
 }
+var dump = "";
 var csvRows = eclipseTrackCSV.split('\n');
 var csvLabels = csvRows[0].split(',');
 for (var i = 1; i < csvRows.length; i++){
@@ -35,39 +50,8 @@ for (var i = 1; i < csvRows.length; i++){
     eclipseTracks.northPositions.push(csvRowObject.NorthLimitLon,csvRowObject.NorthLimitLat)
     eclipseTracks.southPositions.push(csvRowObject.SouthLimitLon,csvRowObject.SouthLimitLat)
     eclipseTracks.centralPositions.push(csvRowObject.CentralLon,csvRowObject.CentralLat)
+    dump += csvRowObject.SouthLimitLon.toFixed(3) + ", " + csvRowObject.SouthLimitLat.toFixed(3) + ", 0.0,\n";
 }
+console.log(dump);
 
-var viewer = new Cesium.Viewer('cesiumContainer', {
-    // Set the clock to loop over the duration of the August 21, 2017 eclipse
-    clock: new Cesium.Clock({
-        startTime:   Cesium.JulianDate.fromIso8601('2017-08-21T16:50:00Z'),
-        currentTime: Cesium.JulianDate.fromIso8601('2017-08-21T16:50:00Z'),
-        stopTime:    Cesium.JulianDate.fromIso8601('2017-08-21T20:02:00Z'),
-        clockRange:  Cesium.ClockRange.LOOP_STOP,
-        clockStep:   Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER,
-        multiplier:  300   
-    })
-});
-
-// Build a polyline for each of the northern limit, southern limit, and central eclipse track lines.
-var trackPolylines = viewer.scene.primitives.add(new Cesium.PolylineCollection());
-
-var northLimitTrackPolyline = trackPolylines.add({
-    positions: Cesium.Cartesian3.fromDegreesArray(eclipseTracks.northPositions),
-    material: Cesium.Material.fromType('Color', {
-        color: new Cesium.Color(1.0, 1.0, 1.0, 1.0)
-    })
-});
-
-var southLimitTrackPolyline = trackPolylines.add({
-    positions: Cesium.Cartesian3.fromDegreesArray(eclipseTracks.southPositions),
-    material: Cesium.Material.fromType('Color', {
-        color: new Cesium.Color(1.0, 1.0, 1.0, 1.0)
-    })
-});
-
-var centralTrackPolyline = trackPolylines.add({
-    positions: Cesium.Cartesian3.fromDegreesArray(eclipseTracks.centralPositions),
-    width: 5,
-    material: Cesium.Material.fromType(Cesium.Material.PolylineGlowType)
-});
+*/
