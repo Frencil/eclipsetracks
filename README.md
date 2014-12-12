@@ -10,26 +10,16 @@ It presently uses [NASA data](http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2
 
 [Cesium](https://github.com/AnalyticalGraphicsInc/cesium) powers the application and it is installed as a subtree in the top-level directory `cesium`.
 
-Presently only one eclipse track (August 21, 2017 - North America) is modeled and is done so in JavaScript in `2017Eclipse.js`.
+Presently only one eclipse track (August 21, 2017 - North America) is modeled. This is done in CZML in the `data` directory in `2017-08-21.czml`.
 
 ## Data import
 
-The data set used comes from [NASA](http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Aug21Tpath.html) but lacks importable formatting. Presently the data is manually reworked into a parseable CSV string and parsed into the `eclipseTracks` object in `2017Eclipse.js`.
+The data set used comes from [NASA](http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Aug21Tpath.html) but lacks easily importable formatting. Presently the data is manually reworked into a parseable CSV with regular expressions (the output for this can be seen in `data/2017-08-21.csv`).
 
-## Next steps
+From there some quick and dirty JavaScript was used to provide the array values for the CZML document.
 
-### Cleaner data import
+## Trajectory
 
-The data set for this and other eclipses lend themselves to formatting as distinct CZML documents.
+See the [issues](https://github.com/Frencil/eclipsetracks/issues) page for a list of things to do next.
 
-### Animated moon shadow
-
-Having the clock constrain to the time of the eclipse event is only useful with some animation. I've begun reading documentation regarding how I might animate a shadow running through the eclipse track. While the original data set from NASA does provide a track width value at each time interval, facilitating rendering an ellipse at each interval in the right spot at the right size, an accurate representation would also show the eccentricity of the shadow's ellipse as the phase angle changes (i.e. at the end of the tracks the shadow is stretched out, at the center of the track it's essentially circular.
-
-### Additional information
-
-Some guiding help text to orient first-time visitors. Also links to some choice third parties, such as [EclipseMaps.com](http://www.eclipse-maps.com/Eclipse-Maps/Welcome.html), [NASA](http://eclipse.gsfc.nasa.gov/SEgoogle/SEgoogle2001/SE2017Aug21Tgoogle.html), and info about solar eclipse viewing glasses and/or solar filters for telescopes.
-
-### Multiple events and event switching
-
-Import data for any other future solar eclipse event and expand the app to provide intuitive navigation between distinct events.
+In general, the app is still in its infancy. It still needs to more robustly model a single eclipse event, then it needs the scaffolding for modeling *n* eclipse events, past and future.
