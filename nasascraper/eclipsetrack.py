@@ -8,6 +8,7 @@ class eclipsetrack:
 
   # Start by taking a raw data string and parsing it build the waypoints list
   def __init__(self, rawdata):
+    self.waypoints = []
     allrows = rawdata.split('\r')
     limits = 0
     for row in allrows:
