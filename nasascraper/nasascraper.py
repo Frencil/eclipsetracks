@@ -2,6 +2,7 @@
 
 import urllib3
 import eclipsetrack
+from czml import czml
 from datetime import date
 
 # Manually curated list of tuples for date / URL of various eclipse events available on NASA's website
