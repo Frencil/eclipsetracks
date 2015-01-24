@@ -1,0 +1,21 @@
+language: python
+python:
+  - "3.2"
+  - "3.3"
+  - "2.7"
+  - "2.6"
+# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+# install: PLEASE CHANGE ME
+install:
+    pip install coveralls --use-mirrors
+
+# command to run tests, e.g. python setup.py test
+script:
+    coverage run --source=czml setup.py test
+
+after_success:
+    coveralls
+
+notifications:
+  email:
+    - christian.ledermann@gmail.com
