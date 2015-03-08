@@ -11,7 +11,6 @@ defineSuite([
         'Specs/createCamera',
         'Specs/createContext',
         'Specs/createFrameState',
-        'Specs/destroyContext',
         'Specs/render'
     ], function(
         Material,
@@ -25,7 +24,6 @@ defineSuite([
         createCamera,
         createContext,
         createFrameState,
-        destroyContext,
         render) {
     "use strict";
     /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
@@ -43,15 +41,13 @@ defineSuite([
     });
 
     afterAll(function() {
-        destroyContext(context);
+        context.destroyForSpecs();
     });
 
     beforeEach(function() {
         us = context.uniformState;
         us.update(context, createFrameState(createCamera({
-            eye : new Cartesian3(1.02, 0.0, 0.0),
-            target : Cartesian3.ZERO,
-            up : Cartesian3.UNIT_Z
+            offset : new Cartesian3(1.02, 0.0, 0.0)
         })));
 
         var ellipsoid = Ellipsoid.UNIT_SPHERE;

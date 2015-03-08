@@ -167,8 +167,7 @@ define([
      * var widget = new Cesium.CesiumWidget('cesiumContainer', {
      *     imageryProvider : new Cesium.OpenStreetMapImageryProvider(),
      *     terrainProvider : new Cesium.CesiumTerrainProvider({
-     *         url : '//cesiumjs.org/smallterrain',
-     *         credit : 'Terrain data courtesy Analytical Graphics, Inc.'
+     *         url : '//cesiumjs.org/stk-terrain/world'
      *     }),
      *     // Use high-res stars downloaded from https://github.com/AnalyticalGraphicsInc/cesium-assets
      *     skyBox : new Cesium.SkyBox({
@@ -293,7 +292,7 @@ define([
                 scene.terrainProvider = options.terrainProvider;
             }
 
-            this._screenSpaceEventHandler = new ScreenSpaceEventHandler(canvas);
+            this._screenSpaceEventHandler = new ScreenSpaceEventHandler(canvas, false);
 
             if (defined(options.sceneMode)) {
                 if (options.sceneMode === SceneMode.SCENE2D) {
@@ -373,6 +372,47 @@ define([
         scene : {
             get : function() {
                 return this._scene;
+            }
+        },
+
+        /**
+         * Gets the collection of image layers that will be rendered on the globe.
+         * @memberof Viewer.prototype
+         *
+         * @type {ImageryLayerCollection}
+         * @readonly
+         */
+        imageryLayers : {
+            get : function() {
+                return this._scene.imageryLayers;
+            }
+        },
+
+        /**
+         * The terrain provider providing surface geometry for the globe.
+         * @memberof CesiumWidget.prototype
+         *
+         * @type {TerrainProvider}
+         */
+        terrainProvider : {
+            get : function() {
+                return this._scene.terrainProvider;
+            },
+            set : function(terrainProvider) {
+                this._scene.terrainProvider = terrainProvider;
+            }
+        },
+
+        /**
+         * Gets the camera.
+         * @memberof CesiumWidget.prototype
+         *
+         * @type {Camera}
+         * @readonly
+         */
+        camera : {
+            get : function() {
+                return this._scene.camera;
             }
         },
 

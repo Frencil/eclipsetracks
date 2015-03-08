@@ -17,8 +17,9 @@ defineSuite([
         'DataSources/SampledProperty',
         'DataSources/TimeIntervalCollectionProperty',
         'Scene/PrimitiveCollection',
-        'Specs/createScene',
-        'Specs/destroyScene'
+        'Specs/createDynamicGeometryBoundingSphereSpecs',
+        'Specs/createDynamicProperty',
+        'Specs/createScene'
     ], function(
         RectangleGeometryUpdater,
         Cartesian3,
@@ -37,8 +38,9 @@ defineSuite([
         SampledProperty,
         TimeIntervalCollectionProperty,
         PrimitiveCollection,
-        createScene,
-        destroyScene) {
+        createDynamicGeometryBoundingSphereSpecs,
+        createDynamicProperty,
+        createScene) {
     "use strict";
     /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
 
@@ -55,7 +57,7 @@ defineSuite([
     });
 
     afterAll(function() {
-        destroyScene(scene);
+        scene.destroyForSpecs();
     });
 
     function createBasicRectangle() {
@@ -114,7 +116,7 @@ defineSuite([
 
         expect(updater.isClosed).toBe(false);
         expect(updater.fillEnabled).toBe(true);
-        expect(updater.fillMaterialProperty).toEqual(ColorMaterialProperty.fromColor(Color.WHITE));
+        expect(updater.fillMaterialProperty).toEqual(new ColorMaterialProperty(Color.WHITE));
         expect(updater.outlineEnabled).toBe(false);
         expect(updater.hasConstantFill).toBe(true);
         expect(updater.hasConstantOutline).toBe(true);
@@ -271,7 +273,7 @@ defineSuite([
     it('Creates expected per-color geometry', function() {
         validateGeometryInstance({
             show : true,
-            material : ColorMaterialProperty.fromColor(Color.RED),
+            material : new ColorMaterialProperty(Color.RED),
             height : 431,
             extrudedHeight : 123,
             granularity : 0.97,
@@ -367,52 +369,51 @@ defineSuite([
     });
 
     it('dynamic updater sets properties', function() {
-        //This test is mostly a smoke screen for now.
-        var time1 = new JulianDate(0, 0);
-        var time2 = new JulianDate(1, 0);
-        var time3 = new JulianDate(2, 0);
+        var rectangle = new RectangleGraphics();
+        rectangle.coordinates = createDynamicProperty(new Rectangle(0, 0, 1, 1));
+        rectangle.show = createDynamicProperty(true);
+        rectangle.height = createDynamicProperty(3);
+        rectangle.extrudedHeight = createDynamicProperty(2);
+        rectangle.outline = createDynamicProperty(true);
+        rectangle.fill = createDynamicProperty(true);
+        rectangle.granularity = createDynamicProperty(2);
+        rectangle.stRotation = createDynamicProperty(1);
 
-        function makeProperty(value1, value2) {
-            var property = new TimeIntervalCollectionProperty();
-            property.intervals.addInterval(new TimeInterval({
-                start : time1,
-                stop : time2,
-                isStopIncluded : false,
-                data : value1
-            }));
-            property.intervals.addInterval(new TimeInterval({
-                start : time2,
-                stop : time3,
-                isStopIncluded : false,
-                data : value2
-            }));
-            return property;
-        }
-
-        var entity = createBasicRectangle();
-
-        var rectangle = entity.rectangle;
-        rectangle.height = makeProperty(2, 12);
-        rectangle.extrudedHeight = makeProperty(1, 11);
-        rectangle.outline = makeProperty(true, false);
-        rectangle.fill = makeProperty(false, true);
-
-        entity.availability = new TimeIntervalCollection();
-        entity.availability.addInterval(new TimeInterval({
-            start : time1,
-            stop : time3,
-            isStopIncluded : false
-        }));
+        var entity = new Entity();
+        entity.rectangle = rectangle;
 
         var updater = new RectangleGeometryUpdater(entity, scene);
         var primitives = new PrimitiveCollection();
         var dynamicUpdater = updater.createDynamicUpdater(primitives);
         expect(dynamicUpdater.isDestroyed()).toBe(false);
         expect(primitives.length).toBe(0);
-        dynamicUpdater.update(time1);
-        expect(primitives.length).toBe(1);
-        dynamicUpdater.destroy();
+
+        dynamicUpdater.update(time);
+        expect(primitives.length).toBe(2);
+
+        var options = dynamicUpdater._options;
+        expect(options.id).toEqual(entity);
+        expect(options.rectangle).toEqual(rectangle.coordinates.getValue());
+        expect(options.height).toEqual(rectangle.height.getValue());
+        expect(options.extrudedHeight).toEqual(rectangle.extrudedHeight.getValue());
+        expect(options.granularity).toEqual(rectangle.granularity.getValue());
+        expect(options.stRotation).toEqual(rectangle.stRotation.getValue());
+
+        //If a dynamic show returns false, the primitive should go away.
+        rectangle.show.setValue(false);
+        dynamicUpdater.update(time);
         expect(primitives.length).toBe(0);
+
+        rectangle.show.setValue(true);
+        dynamicUpdater.update(time);
+        expect(primitives.length).toBe(2);
+
+        //If a dynamic coordinates returns undefined, the primitive should go away.
+        rectangle.coordinates.setValue(undefined);
+        dynamicUpdater.update(time);
+        expect(primitives.length).toBe(0);
+
+        dynamicUpdater.destroy();
         updater.destroy();
     });
 
@@ -513,5 +514,11 @@ defineSuite([
         expect(function() {
             return new RectangleGeometryUpdater(entity, undefined);
         }).toThrowDeveloperError();
+    });
+
+    var entity = createBasicRectangle();
+    entity.rectangle.extrudedHeight = createDynamicProperty(2);
+    createDynamicGeometryBoundingSphereSpecs(RectangleGeometryUpdater, entity, entity.rectangle, function() {
+        return scene;
     });
 });

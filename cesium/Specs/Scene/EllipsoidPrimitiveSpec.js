@@ -10,8 +10,6 @@ defineSuite([
         'Specs/createContext',
         'Specs/createFrameState',
         'Specs/createScene',
-        'Specs/destroyContext',
-        'Specs/destroyScene',
         'Specs/pick',
         'Specs/render'
     ], function(
@@ -25,8 +23,6 @@ defineSuite([
         createContext,
         createFrameState,
         createScene,
-        destroyContext,
-        destroyScene,
         pick,
         render) {
     "use strict";
@@ -42,15 +38,13 @@ defineSuite([
     });
 
     afterAll(function() {
-        destroyContext(context);
+        context.destroyForSpecs();
     });
 
     beforeEach(function() {
         ellipsoid = new EllipsoidPrimitive();
         frameState = createFrameState(createCamera({
-            eye :new Cartesian3(1.02, 0.0, 0.0),
-            target : Cartesian3.ZERO,
-            up : Cartesian3.UNIT_Z
+            offset : new Cartesian3(1.02, 0.0, 0.0)
         }));
         us = context.uniformState;
         us.update(context, frameState);
@@ -154,7 +148,7 @@ defineSuite([
         expect(pixels[2]).toEqual(0);
         expect(pixels[3]).toEqual(255);
 
-        destroyScene(scene);
+        scene.destroyForSpecs();
     });
 
     it('does not render when show is false', function() {

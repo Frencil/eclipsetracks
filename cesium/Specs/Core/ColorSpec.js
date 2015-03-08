@@ -44,6 +44,16 @@ defineSuite([
         expect(v.alpha).toEqual(0.4);
     });
 
+    it('fromBytes works with result parameter', function() {
+        var result = new Color();
+        var v = Color.fromBytes(0, 255, 51, 102, result);
+        expect(v).toBe(result);
+        expect(v.red).toEqual(0.0);
+        expect(v.green).toEqual(1.0);
+        expect(v.blue).toEqual(0.2);
+        expect(v.alpha).toEqual(0.4);
+    });
+
     it('toBytes returns the same values that fromBytes took', function() {
         var r = 5;
         var g = 87;
@@ -149,6 +159,10 @@ defineSuite([
         expect(Color.LIME.toCssColorString()).toEqual('rgb(0,255,0)');
         expect(new Color(0.0, 0.0, 0.0, 1.0).toCssColorString()).toEqual('rgb(0,0,0)');
         expect(new Color(0.1, 0.2, 0.3, 0.4).toCssColorString()).toEqual('rgba(25,51,76,0.4)');
+    });
+
+    it('fromCssColorString supports transparent', function() {
+        expect(Color.fromCssColorString('transparent')).toEqual(new Color(0.0, 0.0, 0.0, 0.0));
     });
 
     it('fromCssColorString supports the #rgb format', function() {
@@ -345,6 +359,47 @@ defineSuite([
                 maximumAlpha : 0
             });
         }).toThrowDeveloperError();
+    });
+
+    it('fromAlpha works', function() {
+        var result = Color.fromAlpha(Color.RED, 0.5);
+        expect(result).toEqual(new Color(1, 0, 0, 0.5));
+    });
+
+    it('fromAlpha works with result parameter', function() {
+        var resultParam = new Color();
+        var result = Color.fromAlpha(Color.RED, 0.5, resultParam);
+        expect(resultParam).toBe(result);
+        expect(result).toEqual(new Color(1, 0, 0, 0.5));
+    });
+
+    it('fromAlpha throws with undefined color', function() {
+        var result = new Color();
+        expect(function() {
+            Color.fromAlpha(undefined, 0.5, result);
+        }).toThrowDeveloperError();
+    });
+
+    it('fromAlpha throws with undefined color', function() {
+        var result = new Color();
+        expect(function() {
+            Color.fromAlpha(undefined, 0.5, result);
+        }).toThrowDeveloperError();
+    });
+
+    it('fromAlpha throws with undefined alpha', function() {
+        var result = new Color();
+        var color = new Color();
+        expect(function() {
+            Color.fromAlpha(color, undefined, result);
+        }).toThrowDeveloperError();
+    });
+
+    it('withAlpha works', function() {
+        var resultParam = new Color();
+        var result = Color.RED.withAlpha(0.5, resultParam);
+        expect(resultParam).toBe(result);
+        expect(result).toEqual(new Color(1, 0, 0, 0.5));
     });
 
     it('toString produces correct results', function() {

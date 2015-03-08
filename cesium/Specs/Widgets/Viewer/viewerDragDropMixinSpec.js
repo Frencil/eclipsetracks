@@ -78,7 +78,7 @@ defineSuite([
     });
 
     it('mixin works with dropTarget id string', function() {
-        viewer = new Viewer(document.body);
+        viewer = new Viewer(container);
         viewer.extend(viewerDragDropMixin, {
             dropTarget : 'container'
         });
@@ -393,6 +393,16 @@ defineSuite([
         expect(dropTarget2.events.dragenter).toBeDefined();
         expect(dropTarget2.events.dragover).toBeDefined();
         expect(dropTarget2.events.dragexit).toBeDefined();
+    });
+
+    it('can set proxy.', function() {
+        var proxy = {};
+
+        viewer = new Viewer(container);
+        viewer.extend(viewerDragDropMixin, {
+            proxy : proxy
+        });
+        expect(viewer.proxy).toBe(proxy);
     });
 
     it('throws with undefined viewer', function() {

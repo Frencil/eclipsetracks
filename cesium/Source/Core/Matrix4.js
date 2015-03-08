@@ -2113,24 +2113,33 @@ define([
      * //Prints "Both matrices are equal" on the console
      */
     Matrix4.equals = function(left, right) {
+        // Given that most matrices will be transformation matrices, the elements
+        // are tested in order such that the test is likely to fail as early
+        // as possible.  I _think_ this is just as friendly to the L1 cache
+        // as testing in index order.  It is certainty faster in practice.
         return (left === right) ||
                (defined(left) &&
                 defined(right) &&
-                left[0] === right[0] &&
-                left[1] === right[1] &&
-                left[2] === right[2] &&
-                left[3] === right[3] &&
-                left[4] === right[4] &&
-                left[5] === right[5] &&
-                left[6] === right[6] &&
-                left[7] === right[7] &&
-                left[8] === right[8] &&
-                left[9] === right[9] &&
-                left[10] === right[10] &&
-                left[11] === right[11] &&
+                // Translation
                 left[12] === right[12] &&
                 left[13] === right[13] &&
                 left[14] === right[14] &&
+
+                // Rotation/scale
+                left[0] === right[0] &&
+                left[1] === right[1] &&
+                left[2] === right[2] &&
+                left[4] === right[4] &&
+                left[5] === right[5] &&
+                left[6] === right[6] &&
+                left[8] === right[8] &&
+                left[9] === right[9] &&
+                left[10] === right[10] &&
+
+                // Bottom row
+                left[3] === right[3] &&
+                left[7] === right[7] &&
+                left[11] === right[11] &&
                 left[15] === right[15]);
     };
 
@@ -2633,6 +2642,28 @@ define([
      */
     Matrix4.prototype.equals = function(right) {
         return Matrix4.equals(this, right);
+    };
+
+    /**
+     * @private
+     */
+    Matrix4.equalsArray = function(matrix, array, offset) {
+        return matrix[0] === array[offset] &&
+               matrix[1] === array[offset + 1] &&
+               matrix[2] === array[offset + 2] &&
+               matrix[3] === array[offset + 3] &&
+               matrix[4] === array[offset + 4] &&
+               matrix[5] === array[offset + 5] &&
+               matrix[6] === array[offset + 6] &&
+               matrix[7] === array[offset + 7] &&
+               matrix[8] === array[offset + 8] &&
+               matrix[9] === array[offset + 9] &&
+               matrix[10] === array[offset + 10] &&
+               matrix[11] === array[offset + 11] &&
+               matrix[12] === array[offset + 12] &&
+               matrix[13] === array[offset + 13] &&
+               matrix[14] === array[offset + 14] &&
+               matrix[15] === array[offset + 15];
     };
 
     /**

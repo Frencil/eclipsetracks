@@ -716,15 +716,10 @@ define([
         if (!defined(positions)) {
             throw new DeveloperError('positions is required.');
         }
-        if (positions.length < 3) {
-            throw new DeveloperError('At least three positions are required.');
-        }
         //>>includeEnd('debug');
 
         var length = positions.length;
-
         var cleanedPositions = [];
-
         for ( var i0 = length - 1, i1 = 0; i1 < length; i0 = i1++) {
             var v0 = positions[i0];
             var v1 = positions[i1];
@@ -870,7 +865,7 @@ define([
         var edges = {};
 
         var radius = ellipsoid.maximumRadius;
-        var minDistance = 2.0 * radius * Math.sin(granularity * 0.5);
+        var minDistance = CesiumMath.chordLength(granularity, radius);
         var minDistanceSqrd = minDistance * minDistance;
 
         while (triangles.length > 0) {
