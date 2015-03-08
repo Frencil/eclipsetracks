@@ -1,7 +1,6 @@
 [
   {
     "id": "document",
-    "name": "20170821_czml",
     "version": "1.0",
     "clock": {
       "interval": "2017-08-21T16:50:00Z/2017-08-21T20:00:00Z",
@@ -13,20 +12,15 @@
   },
   {
     "id": "20170821_central_polyline",
-    "name": "20170821_central_polyline",
     "polyline": {
       "width": 5,
-      "show": {
-        "interval": "2017-08-21T16:50:00Z/2017-08-21T20:00:00Z",
-        "boolean": true
-      },
+      "show": true,
       "material": {
         "polylineGlow": {
           "color": { "rgba": [223,150,47,128] },
           "glowPower": 0.25
         }
       },
-      "epoch": "2017-08-21T16:50:00Z",
       "followSurface": true,
       "positions": {
         "cartographicDegrees": [
@@ -132,19 +126,14 @@
   },
   {
     "id": "20170821_north_polyline",
-    "name": "20170821_north_polyline",
     "polyline": {
       "width": 1,
-      "show": {
-        "interval": "2017-08-21T16:50:00Z/2017-08-21T20:00:00Z",
-        "boolean": true
-      },
+      "show": true,
       "material": {
         "solidColor": {
           "color": { "rgba": [255,255,255,128] }
         }
       },
-      "epoch": "2017-08-21T16:50:00Z",
       "followSurface": true,
       "positions": {
         "cartographicDegrees": [
@@ -250,19 +239,14 @@
   },
   {
     "id": "20170821_south_polyline",
-    "name": "20170821_south_polyline",
     "polyline": {
       "width": 1,
-      "show": {
-        "interval": "2017-08-21T16:50:00Z/2017-08-21T20:00:00Z",
-        "boolean": true
-      },
+      "show": true,
       "material": {
         "solidColor": {
           "color": { "rgba": [255,255,255,128] }
         }
       },
-      "epoch": "2017-08-21T16:50:00Z",
       "followSurface": true,
       "positions": {
         "cartographicDegrees": [
@@ -368,7 +352,6 @@
   },
   {
     "id": "20170821_shadow_ellipse",
-    "name": "20170821_shadow_ellipse",
     "position": {
       "cartographicDegrees": [
         "2017-08-21T16:50:00Z", -162.850, 41.487, 0.0,
@@ -476,10 +459,7 @@
           "color": { "rgba": [0,0,0,160] }
         }
       },
-      "show": {
-        "interval": "2017-08-21T16:50:00Z/2017-08-21T20:00:00Z",
-        "boolean": true
-      },
+      "show": true,
       "semiMajorAxis": {
         "number": [
           "2017-08-21T16:50:00Z", 35000,
