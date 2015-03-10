@@ -1,2 +1,0 @@
-2015-03-20,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html
-2017-08-21,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Aug21Tpath.html

@@ -38,7 +38,7 @@ eclipses = {
             var parts = lines[i].split(",");
             var date  = new Date(parts[0]);
             var iso   = date.toISOString().substr(0,10);
-            var czml  = 'data/' + iso + '.czml';
+            var czml  = 'czml/' + iso + '.czml';
             var event = { date: date, url: parts[1], czml: czml };
 
             // Store events in an associative array with an iso index for walking
@@ -53,7 +53,7 @@ eclipses = {
     },
 
     current: function(){
-        return this.czml_isos[this.czml_isos.length-1];
+        return this.czml_isos[0];
     },
 
     render: function(iso){
