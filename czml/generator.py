@@ -23,14 +23,23 @@ for event_line in events:
         continue
 
     try:
+
         date = datetime.datetime.strptime(iso, "%Y-%m-%d").date()
         track = eclipsescraper.EclipseTrack(date)
         track.loadFromURL(url)
-        czml = track.czml()
-        czml_filename = track.date.strftime("%Y-%m-%d") + ".czml"
+        iso2 = track.date.strftime("%Y-%m-%d")
+
+        track_czml = track.czml()
+        czml_filename = iso2 + ".czml"
         with open(czml_filename, 'w') as outfile:
-            json.dump(czml, outfile)
+            json.dump(track_czml, outfile)
             print("Wrote " + czml_filename)
+
+        track_json = track.json()
+        json_filename = iso2 + ".json"
+        with open(json_filename, 'w') as outfile:
+            json.dump(track_json, outfile)
+            print("Wrote " + json_filename)
 
     except Exception:
         print("Error on ISO: " + iso)

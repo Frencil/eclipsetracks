@@ -21,11 +21,11 @@ viewer.camera = new Cesium.Camera(viewer.scene);
 // Module for loading and working with eclipses from local storage
 eclipses = {
 
-    czml_isos: new Array(),
-    czml_events: new Object(),
+    isos: new Array(),
+    events: new Object(),
     current_event_idx: -1,
 
-    load: function() {
+    load_events: function() {
 
         // Initialize variables, read local storage
         var frame = document.getElementById("czml_events");
@@ -42,11 +42,32 @@ eclipses = {
             var date  = new Date(parts[0]);
             var iso   = date.toISOString().substr(0,10);
             var czml  = 'czml/' + iso + '.czml';
-            var event = { date: date, url: parts[1], czml: czml };
+            var json  = 'czml/' + iso + '.json';
+            var json_req = new XMLHttpRequest();
+            var event = { iso: iso, date: date, url: parts[1], czml_path: czml,
+                          json_path: json, json_req: json_req, json: {} };
 
             // Store events in an associative array with an iso index for walking
-            this.czml_isos.push(iso);
-            this.czml_events[iso] = event;
+            this.isos.push(iso);
+            this.events[iso] = event;
+
+            // Load JSON metadata
+            for (var i = 0; i < this.isos.length; i++){
+                var iso = this.isos[i];
+                this.events[iso].json_req.onreadystatechange = function(iso){
+                    var req = eclipses.events[iso].json_req;
+                    if (req.status == 200 && eclipses.isos.indexOf(iso) != -1){
+                        try {
+                            eclipses.events[iso].json = JSON.parse(req.responseText);
+                        } catch(err) {
+                            console.log("Unable to load " + iso + " JSON: " + err.message);
+                        }
+                    }
+                    return false;
+                }(iso);
+                this.events[iso].json_req.open("GET", this.events[iso].json_path + '?t=' + new Date().getTime(), false);
+                this.events[iso].json_req.send();
+            }
 
         }
 
@@ -55,18 +76,26 @@ eclipses = {
         
     },
 
+    load_json: function() {
+        
+        
+
+    },
+
     current: function(){
-        return this.czml_isos[0];
+        // TEMP: just return the 2015-03-20 event
+        return this.isos[3];
     },
 
     render: function(iso){
-        var czml = this.czml_events[iso].czml;
+        var czml_path = this.events[iso].czml_path;
         var czmlDataSource = new Cesium.CzmlDataSource();
-        czmlDataSource.loadUrl(czml);
+        czmlDataSource.loadUrl(czml_path);
         viewer.dataSources.add(czmlDataSource);
-        // TODO: obtain these values from the data source (somehow)
         viewer.camera.flyTo({
-            destination : Cesium.Cartesian3.fromDegrees(-6.422, 64.568, 10000000.0)
+            destination : Cesium.Cartesian3.fromDegrees(this.events[iso].json.camera_position[0],
+                                                        this.events[iso].json.camera_position[1],
+                                                        this.events[iso].json.camera_position[2])
         });
 
     }

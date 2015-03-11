@@ -1,2 +1,13 @@
+2012-05-20,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2012May20Apath.html
+2012-11-13,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2012Nov13Tpath.html
+2013-05-10,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2013May10Apath.html
+2013-11-03,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2013Nov03Hpath.html
 2015-03-20,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html
+2016-03-09,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2016Mar09Tpath.html
+2016-09-01,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2016Sep01Apath.html
+2017-02-26,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Feb26Apath.html
 2017-08-21,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Aug21Tpath.html
+2019-07-02,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2019Jul02Tpath.html
+2019-12-26,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2019Dec26Apath.html
+2020-06-21,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2020Jun21Apath.html
+2020-12-14,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2020Dec14Tpath.html
