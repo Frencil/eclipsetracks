@@ -15,6 +15,12 @@ var viewer = new Cesium.Viewer('cesiumContainer', {
 // Turn on day/night lighting
 viewer.scene.globe.enableLighting = true;
 
+// Add credits
+var c1 = new Cesium.Credit("Built and open sourced by Frencil",void 0,"https://github.com/Frencil/eclipsetracks");
+viewer.scene.frameState.creditDisplay.addDefaultCredit(c1);
+var c2 = new Cesium.Credit("Eclipse Predictions by Fred Espenak, NASA's GSFC",void 0,"http://eclipse.gsfc.nasa.gov/solar.html");
+viewer.scene.frameState.creditDisplay.addDefaultCredit(c2); 
+
 // Define camera
 viewer.camera = new Cesium.Camera(viewer.scene);
 
