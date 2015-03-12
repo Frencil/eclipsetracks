@@ -76,18 +76,15 @@ eclipses = {
         
     },
 
-    load_json: function() {
-        
-        
-
-    },
-
     current: function(){
         // TEMP: just return the 2015-03-20 event
         return this.isos[3];
     },
 
     render: function(iso){
+        if (viewer.dataSources.length > 0){
+            viewer.dataSources.removeAll(true);
+        }
         var czml_path = this.events[iso].czml_path;
         var czmlDataSource = new Cesium.CzmlDataSource();
         czmlDataSource.loadUrl(czml_path);
