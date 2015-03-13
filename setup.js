@@ -52,8 +52,8 @@ eclipses = {
             this.events[iso] = event;
 
             // Load JSON metadata
-            for (var i = 0; i < this.isos.length; i++){
-                var iso = this.isos[i];
+            for (var j = 0; j < this.isos.length; j++){
+                var iso = this.isos[j];
                 this.events[iso].json_req.onreadystatechange = function(iso){
                     var req = eclipses.events[iso].json_req;
                     if (req.status == 200 && eclipses.isos.indexOf(iso) != -1){
@@ -78,7 +78,7 @@ eclipses = {
 
     current: function(){
         // TEMP: just return the 2015-03-20 event
-        return this.isos[3];
+        return this.isos[4];
     },
 
     render: function(iso){
