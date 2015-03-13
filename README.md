@@ -2,24 +2,12 @@
 
 This repository is the source code for [EclipseTracks.org](http://eclipsetracks.org) - Interactive solar eclipse track modeling with Cesium.
 
-It presently uses [NASA data](http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Aug21Tpath.html) to render the track of the great [North American Total Solar Eclipse of 2017](http://eclipse.gsfc.nasa.gov/SEgoogle/SEgoogle2001/SE2017Aug21Tgoogle.html). Its ultimate purpose is model all future solar eclipses as data becomes available.
+It presently uses [NASA data](http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html) to render the track of this year's [Total Solar Eclipse](http://eclipse.gsfc.nasa.gov/SEgoogle/SEgoogle2001/SE2015Mar20Tgoogle.html). Its ultimate purpose is model all predicted solar eclipse events, past and future, with tools to easily navigate between them.
 
-![Screenshot of the EclipseTracks.org, December 7, 2014](http://i.imgur.com/F7EJeya.jpg)
+![Screenshot of the EclipseTracks.org, March 13, 2015](http://i.imgur.com/ezfdH04.png)
 
 ## Composition
 
 [Cesium](https://github.com/AnalyticalGraphicsInc/cesium) powers the application and it is installed as a subtree in the top-level directory `cesium`.
 
-Presently only one eclipse track (August 21, 2017 - North America) is modeled. This is done in CZML in the `data` directory in `2017-08-21.czml`.
-
-## Data import
-
-The data set used comes from [NASA](http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2017Aug21Tpath.html) but lacks easily importable formatting. Presently the data is manually reworked into a parseable CSV with regular expressions (the output for this can be seen in `data/2017-08-21.csv`).
-
-From there some quick and dirty JavaScript was used to provide the array values for the CZML document.
-
-## Trajectory
-
-See the [issues](https://github.com/Frencil/eclipsetracks/issues) page for a list of things to do next.
-
-In general, the app is still in its infancy. It still needs to more robustly model a single eclipse event, then it needs the scaffolding for modeling *n* eclipse events, past and future.
+In the `czml` directory are generated CZML and JSON files for all eclipse events described (by ISO data and link to tabular data) in `czml/events.txt`. The python script `czml/generator.py` uses [eclipsescraper](https://github.com/Frencil/eclipsescraper), a purpose-built python module, to transform NASA eclipse data into usable CZML files depicting tracks and shadows.
