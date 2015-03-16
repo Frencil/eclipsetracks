@@ -1,1 +1,1 @@
-{"type": "annular", "camera_position": [80.308, 30.615, 10000000.0]}
+{"type": "annular", "regions": ["eastern asia", "indian ocean", "middle east", "northern africa", "southeastern asia"], "camera_position": [80.308, 30.615, 10000000.0]}

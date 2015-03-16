@@ -1,1 +1,1 @@
-{"type": "annular", "camera_position": [38.025, -10.84, 10000000.0]}
+{"type": "annular", "regions": ["indian ocean", "south atlantic", "southern africa"], "camera_position": [38.025, -10.84, 10000000.0]}
