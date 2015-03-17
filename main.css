@@ -19,6 +19,10 @@ html, body {
   background-color: #000; height:100vh; padding-left: 2px;
 }
 
+tr.eclipse { 
+  cursor: pointer;
+}
+
 @font-face {
 	font-family: 'icomoon';
 	src:url('fonts/icomoon.eot?jydsb7');
