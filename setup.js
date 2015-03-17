@@ -1,3 +1,5 @@
+"use strict";
+
 // Define API key
 Cesium.BingMapsApi.defaultKey = "AmsUN3rpnZqwZnpvigSSuP0Xox53w8lgonqh8pORPGtD5R1qMrwnzotPwzr5eUVq";
 
@@ -24,7 +26,7 @@ viewer.scene.globe.enableLighting = true;
 viewer.camera = new Cesium.Camera(viewer.scene);
 
 // Module for loading and working with eclipses from local storage
-eclipses = {
+var eclipses = {
 
     isos: new Array(),
     events: new Object(),
