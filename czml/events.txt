@@ -1,6 +1,6 @@
-2012-05-20,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2012May20Apath.html
+2012-05-20,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2012May20Apath.html,bad
 2012-11-13,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2012Nov13Tpath.html
-2013-05-10,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2013May10Apath.html
+2013-05-10,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2013May10Apath.html,bad
 2013-11-03,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2013Nov03Hpath.html
 2015-03-20,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html
 2016-03-09,http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2016Mar09Tpath.html

@@ -91,8 +91,12 @@ eclipses = {
 
             if (lines[i].indexOf(",") == -1) { continue; }
 
-            // Parse the line into a fully formed object
             var parts = lines[i].split(",");
+
+            // Some events are known bad (they freeze Cesium) so let's skip those
+            if (parts[2] == 'bad'){ continue; }
+
+            // Parse the line into a fully formed object
             var date  = new Date(parts[0]);
             var iso   = date.toISOString().substr(0,10);
             var czml_path = 'czml/' + iso + '.czml';
@@ -118,6 +122,9 @@ eclipses = {
                 eclipses.events[iso].region_string = eclipses.formatRegionString(eclipses.events[iso].json.regions);
             });
 
+            // Render eclipse navigation
+            eclipses.nav();
+
             // Render the most current event
             eclipses.render(eclipses.current());
             
@@ -130,16 +137,30 @@ eclipses = {
     current: function(){
         // TODO: some logic for determining the best "current" iso for an arbitrary date
         // for now just return the 2015-03-20 event
-        this.current_event_idx = 4;
-        return this.isos[4];
+        return '2015-03-20';
     },
 
     render: function(iso){
-        document.getElementById("now_showing").innerHTML = "<i>Loading...</i><br><br>";
-        var eclipse = this.events[iso];
-        if (viewer.dataSources.length > 0){
-            viewer.dataSources.removeAll(true);
+
+        var new_event_index = this.isos.indexOf(iso);
+        if (new_event_index == -1){
+            console.log('Unable to render iso: ' + iso);
+            return false;
         }
+        if (new_event_index == this.current_event_idx){
+            return false;
+        }
+
+        // Visually deselect/dehighlight everything
+        if (this.current_event_idx != -1){
+            var current_iso = this.isos[this.current_event_idx];
+            document.getElementById("tr-"+current_iso).className = "eclipse";
+            document.getElementById("now_showing").innerHTML = "<h4>Loading...</h4>";
+        }
+        viewer.dataSources.removeAll(true);
+
+        // Load the new eclipse event
+        var eclipse = this.events[iso];
         var czml_path = eclipse.czml_path;
         var czmlDataSource = new Cesium.CzmlDataSource();
         czmlDataSource.loadUrl(czml_path);
@@ -161,8 +182,13 @@ eclipses = {
                  + '<div class="col-xs-5"><h4><div class="label label-info"><span class="icon-regions"></span> Regions</div></div>'
                  + '<div class="col-xs-7">' + eclipse.region_string + '</div>'
                  + '</div>';
+
+        // Visually select/highlight everything
         document.getElementById("now_showing").innerHTML = html;
-        this.nav();
+        document.getElementById("tr-"+iso).className = "warning";
+        this.current_event_idx = new_event_index;
+
+        return true;
     },
 
     nav: function(){
@@ -179,9 +205,8 @@ eclipses = {
             var tr_onclick = 'eclipses.render(\'' + iso + '\');';
             if (e == this.current_event_idx){
                 tr_class = 'warning';
-                tr_onclick = '';
             }
-            html += '<tr class="' + tr_class + '" onclick="' + tr_onclick + '" >'
+            html += '<tr id="tr-' + iso + '" class="' + tr_class + '" onclick="' + tr_onclick + '" >'
                  +  '<td><b>' + date + '</b><br><div class="label label-primary"><span class="icon-type"></span> ' + type + '</div></td>'
                  +  '<td><small>' + eclipse.region_string + '</small></td>'
                  +  '</tr>';
