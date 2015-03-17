@@ -2,21 +2,69 @@ html, body {
   width: 100%; height: 100%; margin: 0px; padding: 0px; overflow: hidden;
 }
 
-#title { 
-  position: absolute; top: 0px; height: 105px; width: 90%;
+.nav_block { 
+  display: block;
+  width: 100%;
+  padding: 8px 8px 0px 8px;
+  margin-top: 0px;
+  margin-bottom: 0px;
 }
 
-#nav { 
-  position: absolute; bottom: 125px; top: 105px; width: 90%;
+.nav_block h2 { margin-top: 6px; }
+.nav_block h3 { margin-top: 0px; }
+
+#nav_title { 
+  height: 85px;
+  border-bottom: 1px solid #111;
+}
+
+#nav_showing { 
+  height: 190px;
+  border-bottom: 1px solid #111;
+  overflow: hidden;
+}
+
+#nav_other { 
+  height: calc(100% - 85px - 190px - 120px);
   overflow-y: auto; overflow-x: hidden;
+  border-bottom: 1px solid #111;
 }
 
-#credits { 
-  position: absolute; bottom: 0px; height: 125px; width: 90%; font-size: 80%;
+#nav_credits { 
+  font-size: 80%;
+  height: 120px;
 }
 
-#cesiumContainer { 
-  background-color: #000; height:100vh; padding-left: 2px;
+@media (max-width: 639px) {
+  #navContainer {
+    display: none;
+  }
+  #cesiumContainer { 
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    width: 100%;
+    height:100%; 
+  }
+}
+
+@media (min-width: 640px) {
+  #navContainer {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    height: 100%;
+    width: 320px;
+    border-right: 2px solid #111;
+    overflow: hidden;
+  }
+  #cesiumContainer { 
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    width: calc(100% - 320px);
+    height:100%; 
+  }
 }
 
 tr.eclipse { 
