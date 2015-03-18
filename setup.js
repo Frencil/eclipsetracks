@@ -1,5 +1,12 @@
 "use strict";
 
+// Global to track if we can use promises or not
+var canUsePromises = false;
+if (typeof Promise !== "undefined" && Promise.toString().indexOf("[native code]") !== -1){
+    canUsePromises = true;
+}
+var json_reqs = [];
+
 // Define API key
 Cesium.BingMapsApi.defaultKey = "AmsUN3rpnZqwZnpvigSSuP0Xox53w8lgonqh8pORPGtD5R1qMrwnzotPwzr5eUVq";
 
@@ -58,11 +65,11 @@ var eclipses = {
         return region_string;
     },
 
-    loadJSON: function(url) {
+    loadJSONPromise: function(url) {
         return new Promise(function(resolve, reject) {
             var req = new XMLHttpRequest();
             req.open('GET', url);
-
+            
             req.onload = function() {
                 if (req.status == 200) {
                     resolve(req.response);
@@ -70,13 +77,52 @@ var eclipses = {
                     reject(Error(req.statusText));
                 }
             };
-
+            
             req.onerror = function() {
                 reject(Error("Network Error"));
             };
-
+            
             req.send();
         });
+    },
+
+    loadJSONnoPromise: function(iso) {
+        var req = new XMLHttpRequest();
+        req.onload = function(){
+            if (req.status == 200){
+                try {
+                    var json = JSON.parse(req.responseText);
+                    var iso  = json.iso;
+                    eclipses.events[iso].json = JSON.parse(req.responseText);
+                    eclipses.events[iso].region_string = eclipses.formatRegionString(eclipses.events[iso].json.regions);
+                    eclipses.loadCurrentAndNavNoPromise();
+                } catch(err) {
+                    console.log("Unable to load " + iso + " JSON: " + err.message);
+                }
+            }
+        };
+        req.open("GET", this.events[iso].json_path + '?t=' + new Date().getTime());
+        req.send();
+        json_reqs.push(req);
+    },
+
+    loadCurrentAndNavNoPromise: function(){
+        var all_loaded = true;
+        for (var i = 0; i < eclipses.isos.length; i++){
+            if (typeof json_reqs[i] == "undefined"){
+                all_loaded = false;
+                break;
+            } else if (json_reqs[i].status != 200){
+                all_loaded = false;
+                break;
+            }
+        }
+        if (all_loaded){
+            // Render eclipse navigation
+            this.nav();
+            // Render the most current event
+            this.render(this.current());
+        }
     },
 
     loadEvents: function() {
@@ -103,36 +149,45 @@ var eclipses = {
             var iso   = date.toISOString().substr(0,10);
             var czml_path = 'czml/' + iso + '.czml';
             var json_path = 'czml/' + iso + '.json';
+            var json_req = new XMLHttpRequest();
             var event = { iso: iso, date: date, url: parts[1], region_string: '',
-                          czml_path: czml_path, json_path: json_path, json: {} };
+                          czml_path: czml_path, json_path: json_path, json: {}, json_req: json_req };
 
             // Store events in an associative array with an iso index for walking
             this.isos.push(iso);
             this.events[iso] = event;
 
             // Load JSON for the event
-            promises.push(this.loadJSON(json_path));
+            if (canUsePromises){
+                promises.push(this.loadJSONPromise(json_path));
+            } else {
+                this.loadJSONnoPromise(iso);
+            }
 
         }
 
-        Promise.all(promises).then(function(dataArray) {
+        if (canUsePromises){
+
+            Promise.all(promises).then(function(dataArray) {
             
-            dataArray.forEach(function(data) {
-                var json = JSON.parse(data);
-                var iso  = json.iso;
-                eclipses.events[iso].json = json;
-                eclipses.events[iso].region_string = eclipses.formatRegionString(eclipses.events[iso].json.regions);
+                dataArray.forEach(function(data) {
+                    var json = JSON.parse(data);
+                    var iso  = json.iso;
+                    eclipses.events[iso].json = json;
+                    eclipses.events[iso].region_string = eclipses.formatRegionString(eclipses.events[iso].json.regions);
+                });
+
+                // Render eclipse navigation
+                eclipses.nav();
+
+                // Render the most current event
+                eclipses.render(eclipses.current());
+            
+            }).catch(function(err) {
+                console.log(err);
             });
 
-            // Render eclipse navigation
-            eclipses.nav();
-
-            // Render the most current event
-            eclipses.render(eclipses.current());
-            
-        }).catch(function(err) {
-            console.log(err);
-        });
+        }
 
     },
 
