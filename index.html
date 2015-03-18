@@ -60,7 +60,25 @@
   <!-- Cesium Container -->
   <div id="cesiumContainer"></div>
 
+  <!-- Load primary application JavaScript and data -->
   <script language="JavaScript" src="setup.js"></script>
   <iframe id="czml_events" src="czml/events.txt" onload="eclipses.loadEvents();" style="display: none;"></iframe>
+
+  <!-- Piwik -->
+  <script type="text/javascript">
+    var _paq = _paq || [];
+    _paq.push(['trackPageView']);
+    _paq.push(['enableLinkTracking']);
+    (function() {
+      var u=(("https:" == document.location.protocol) ? "https" : "http") + "://www.familygiftregistry.net/analytics/piwik/";
+      _paq.push(['setTrackerUrl', u+'piwik.php']);
+      _paq.push(['setSiteId', 2]);
+      var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0]; g.type='text/javascript';
+      g.defer=true; g.async=true; g.src=u+'piwik.js'; s.parentNode.insertBefore(g,s);
+    })();
+  </script>
+  <noscript><p><img src="http://www.familygiftregistry.net/analytics/piwik/piwik.php?idsite=2" style="border:0;" alt="" /></p></noscript>
+<!-- End Piwik Code -->
+
 </body>
 </html>
