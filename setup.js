@@ -192,9 +192,21 @@ var eclipses = {
     },
 
     current: function(){
-        // TODO: some logic for determining the best "current" iso for an arbitrary date
-        // for now just return the 2015-03-20 event
-        return '2015-03-20';
+
+        var today = new Date().toISOString().substr(0,10);
+        var current = null;
+
+        for (var i = 0; i < this.isos.length; i++){
+            if (this.isos[i] > today && current == null){
+                current = this.isos[i];
+            }
+        }
+        if (current == null){
+            current = this.isos[this.isos.length-1];
+        }
+
+        return current;
+
     },
 
     render: function(iso){
