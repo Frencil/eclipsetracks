@@ -217,11 +217,10 @@ var eclipses = {
 
     hash: function(){
         var match = document.location.hash.match(/[\d-]+/);
-        if (typeof match == "object" && eclipses.isos.indexOf(match[0]) != -1){
+        if (match != null && eclipses.isos.indexOf(match[0]) != -1){
             return match[0];
-        } else {
-            return null;
         }
+        return null;
     },
 
     render: function(iso){
