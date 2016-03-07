@@ -274,6 +274,9 @@ var eclipses = {
         // Write the hash to the document's location
         document.location.hash = "#" + iso;
 
+        // Log the event in Piwik
+        _paq.push(['trackPageView', '[Eclipse ISO] ' + iso]);
+
         return true;
     },
 
