@@ -121,7 +121,11 @@ var eclipses = {
             // Render eclipse navigation
             this.nav();
             // Render the most current event
-            this.render(this.current());
+
+            // Render a valid hash or the most current event
+            var target_iso = eclipses.hash();
+            if (!target_iso){ target_iso = eclipses.current(); }
+            this.render(target_iso);
         }
     },
 
@@ -180,8 +184,10 @@ var eclipses = {
                 // Render eclipse navigation
                 eclipses.nav();
 
-                // Render the most current event
-                eclipses.render(eclipses.current());
+                // Render a valid hash or the most current event
+                var target_iso = eclipses.hash();
+                if (!target_iso){ target_iso = eclipses.current(); }
+                eclipses.render(target_iso);
             
             }).catch(function(err) {
                 console.log(err);
@@ -207,6 +213,15 @@ var eclipses = {
 
         return current;
 
+    },
+
+    hash: function(){
+        var match = document.location.hash.match(/[\d-]+/);
+        if (typeof match == "object" && eclipses.isos.indexOf(match[0]) != -1){
+            return match[0];
+        } else {
+            return null;
+        }
     },
 
     render: function(iso){
@@ -257,6 +272,9 @@ var eclipses = {
         document.getElementById("tr-"+iso).className = "warning";
         this.current_event_idx = new_event_index;
 
+        // Write the hash to the document's location
+        document.location.hash = "#" + iso;
+
         return true;
     },
 
@@ -285,4 +303,3 @@ var eclipses = {
     }
     
 };
-
