@@ -4,6 +4,7 @@ defineSuite([
         'Core/Cartesian2',
         'Core/combine',
         'Core/defined',
+        'Core/FeatureDetection',
         'Core/KeyboardEventModifier',
         'Scene/CameraEventType',
         'Specs/createCanvas',
@@ -14,15 +15,15 @@ defineSuite([
         Cartesian2,
         combine,
         defined,
+        FeatureDetection,
         KeyboardEventModifier,
         CameraEventType,
         createCanvas,
         destroyCanvas,
         DomEventSimulator) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
-    var usePointerEvents = defined(window.PointerEvent);
+    var usePointerEvents = FeatureDetection.supportsPointerEvents();
     var canvas;
     var handler;
     var handler2;

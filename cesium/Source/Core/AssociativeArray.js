@@ -7,7 +7,7 @@ define([
         defined,
         defineProperties,
         DeveloperError) {
-    "use strict";
+    'use strict';
 
     /**
      * A collection of key-value pairs that is stored as a hash for easy
@@ -15,10 +15,10 @@ define([
      * @alias AssociativeArray
      * @constructor
      */
-    var AssociativeArray = function() {
+    function AssociativeArray() {
         this._array = [];
         this._hash = {};
-    };
+    }
 
     defineProperties(AssociativeArray.prototype, {
         /**
@@ -117,7 +117,7 @@ define([
         if (hasValue) {
             var array = this._array;
             array.splice(array.indexOf(value), 1);
-            this._hash[key] = undefined;
+            delete this._hash[key];
         }
         return hasValue;
     };
@@ -126,8 +126,11 @@ define([
      * Clears the collection.
      */
     AssociativeArray.prototype.removeAll = function() {
-        this._hash = {};
-        this._array.length = 0;
+        var array = this._array;
+        if (array.length > 0) {
+            this._hash = {};
+            array.length = 0;
+        }
     };
 
     return AssociativeArray;

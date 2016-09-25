@@ -37,7 +37,7 @@ define([
         TerrainProvider,
         throttleRequestByServer,
         TileProviderError) {
-    "use strict";
+    'use strict';
 
     function DataRectangle(rectangle, maxLevel) {
         this.rectangle = rectangle;
@@ -58,15 +58,16 @@ define([
      *                    specified, the WGS84 ellipsoid is used.
      * @param {Credit|String} [options.credit] A credit for the data source, which is displayed on the canvas.
      *
-     * @see TerrainProvider
      *
      * @example
      * var terrainProvider = new Cesium.VRTheWorldTerrainProvider({
-     *   url : '//www.vr-theworld.com/vr-theworld/tiles1.0.0/73/'
+     *   url : 'https://www.vr-theworld.com/vr-theworld/tiles1.0.0/73/'
      * });
      * viewer.terrainProvider = terrainProvider;
+     *
+     * @see TerrainProvider
      */
-    var VRTheWorldTerrainProvider = function VRTheWorldTerrainProvider(options) {
+    function VRTheWorldTerrainProvider(options) {
         options = defaultValue(options, defaultValue.EMPTY_OBJECT);
         if (!defined(options.url)) {
             throw new DeveloperError('options.url is required.');
@@ -79,6 +80,7 @@ define([
 
         this._errorEvent = new Event();
         this._ready = false;
+        this._readyPromise = when.defer();
 
         this._proxy = options.proxy;
 
@@ -88,7 +90,9 @@ define([
                 elementsPerHeight : 3,
                 stride : 4,
                 elementMultiplier : 256.0,
-                isBigEndian : true
+                isBigEndian : true,
+                lowestEncodedHeight : 0,
+                highestEncodedHeight : 256 * 256 * 256 - 1
             };
 
         var credit = options.credit;
@@ -133,6 +137,7 @@ define([
             }
 
             that._ready = true;
+            that._readyPromise.resolve(true);
         }
 
         function metadataFailure(e) {
@@ -145,7 +150,7 @@ define([
         }
 
         requestMetadata();
-    };
+    }
 
     defineProperties(VRTheWorldTerrainProvider.prototype, {
         /**
@@ -201,6 +206,18 @@ define([
         },
 
         /**
+         * Gets a promise that resolves to true when the provider is ready for use.
+         * @memberof VRTheWorldTerrainProvider.prototype
+         * @type {Promise.<Boolean>}
+         * @readonly
+         */
+        readyPromise : {
+            get : function() {
+                return this._readyPromise.promise;
+            }
+        },
+
+        /**
          * Gets a value indicating whether or not the provider includes a water mask.  The water mask
          * indicates which areas of the globe are water rather than land, so they can be rendered
          * as a reflective surface with animated waves.  This function should not be
@@ -238,7 +255,7 @@ define([
      * @param {Boolean} [throttleRequests=true] True if the number of simultaneous requests should be limited,
      *                  or false if the request should be initiated regardless of the number of requests
      *                  already in progress.
-     * @returns {Promise|TerrainData} A promise for the requested geometry.  If this method
+     * @returns {Promise.<TerrainData>|undefined} A promise for the requested geometry.  If this method
      *          returns undefined instead of a promise, it is an indication that too many requests are already
      *          pending and the request will be retried later.
      */

@@ -11,8 +11,7 @@ defineSuite([
         ClockRange,
         ClockStep,
         JulianDate) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     it('default constructor creates a clock', function() {
         var clockViewModel = new ClockViewModel();
@@ -70,13 +69,13 @@ defineSuite([
         clock.clockRange = ClockRange.CLAMPED;
         clock.shouldAnimate = true;
 
-        expect(clockViewModel.startTime).toNotEqual(clock.startTime);
-        expect(clockViewModel.stopTime).toNotEqual(clock.stopTime);
-        expect(clockViewModel.currentTime).toNotEqual(clock.currentTime);
-        expect(clockViewModel.multiplier).toNotEqual(clock.multiplier);
-        expect(clockViewModel.clockStep).toNotEqual(clock.clockStep);
-        expect(clockViewModel.clockRange).toNotEqual(clock.clockRange);
-        expect(clockViewModel.shouldAnimate).toNotEqual(clock.shouldAnimate);
+        expect(clockViewModel.startTime).not.toEqual(clock.startTime);
+        expect(clockViewModel.stopTime).not.toEqual(clock.stopTime);
+        expect(clockViewModel.currentTime).not.toEqual(clock.currentTime);
+        expect(clockViewModel.multiplier).not.toEqual(clock.multiplier);
+        expect(clockViewModel.clockStep).not.toEqual(clock.clockStep);
+        expect(clockViewModel.clockRange).not.toEqual(clock.clockRange);
+        expect(clockViewModel.shouldAnimate).not.toEqual(clock.shouldAnimate);
 
         clock.tick();
 

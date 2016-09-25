@@ -18,6 +18,7 @@ define([
         '../Scene/PolylineCollection',
         '../Scene/PolylineColorAppearance',
         '../Scene/PolylineMaterialAppearance',
+        '../Scene/ShadowMode',
         './BoundingSphereState',
         './ColorMaterialProperty',
         './ConstantProperty',
@@ -42,27 +43,29 @@ define([
         PolylineCollection,
         PolylineColorAppearance,
         PolylineMaterialAppearance,
+        ShadowMode,
         BoundingSphereState,
         ColorMaterialProperty,
         ConstantProperty,
         MaterialProperty,
         Property) {
-    "use strict";
+    'use strict';
 
     //We use this object to create one polyline collection per-scene.
     var polylineCollections = {};
 
     var defaultMaterial = new ColorMaterialProperty(Color.WHITE);
     var defaultShow = new ConstantProperty(true);
+    var defaultShadows = new ConstantProperty(ShadowMode.DISABLED);
 
-    var GeometryOptions = function(entity) {
+    function GeometryOptions(entity) {
         this.id = entity;
         this.vertexFormat = undefined;
         this.positions = undefined;
         this.width = undefined;
         this.followSurface = undefined;
         this.granularity = undefined;
-    };
+    }
 
     /**
      * A {@link GeometryUpdater} for polylines.
@@ -73,7 +76,7 @@ define([
      * @param {Entity} entity The entity containing the geometry to be visualized.
      * @param {Scene} scene The scene where visualization is taking place.
      */
-    var PolylineGeometryUpdater = function(entity, scene) {
+    function PolylineGeometryUpdater(entity, scene) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(entity)) {
             throw new DeveloperError('entity is required');
@@ -91,9 +94,10 @@ define([
         this._geometryChanged = new Event();
         this._showProperty = undefined;
         this._materialProperty = undefined;
+        this._shadowsProperty = undefined;
         this._options = new GeometryOptions(entity);
         this._onEntityPropertyChanged(entity, 'polyline', entity.polyline, undefined);
-    };
+    }
 
     defineProperties(PolylineGeometryUpdater, {
         /**
@@ -194,6 +198,19 @@ define([
             value : undefined
         },
         /**
+         * Gets the property specifying whether the geometry
+         * casts or receives shadows from each light source.
+         * @memberof PolylineGeometryUpdater.prototype
+         * 
+         * @type {Property}
+         * @readonly
+         */
+        shadowsProperty : {
+            get : function() {
+                return this._shadowsProperty;
+            }
+        },
+        /**
          * Gets a value indicating if the geometry is time-varying.
          * If true, all visualization is delegated to the {@link DynamicGeometryUpdater}
          * returned by GeometryUpdater#createDynamicUpdater.
@@ -277,7 +294,7 @@ define([
         var attributes;
         var entity = this._entity;
         var isAvailable = entity.isAvailable(time);
-        var show = new ShowGeometryInstanceAttribute(isAvailable && this._showProperty.getValue(time));
+        var show = new ShowGeometryInstanceAttribute(isAvailable && entity.isShowing && this._showProperty.getValue(time));
 
         if (this._materialProperty instanceof ColorMaterialProperty) {
             var currentColor = Color.WHITE;
@@ -366,6 +383,7 @@ define([
         var isColorMaterial = material instanceof ColorMaterialProperty;
         this._materialProperty = material;
         this._showProperty = defaultValue(show, defaultShow);
+        this._shadowsProperty = defaultValue(polyline.shadows, defaultShadows);
         this._fillEnabled = true;
 
         var width = polyline.width;
@@ -427,7 +445,14 @@ define([
     /**
      * @private
      */
-    var DynamicGeometryUpdater = function(primitives, geometryUpdater) {
+    var generateCartesianArcOptions = {
+        positions : undefined,
+        granularity : undefined,
+        height : undefined,
+        ellipsoid : undefined
+    };
+
+    function DynamicGeometryUpdater(primitives, geometryUpdater) {
         var sceneId = geometryUpdater._scene.id;
 
         var polylineCollection = polylineCollections[sceneId];
@@ -446,21 +471,16 @@ define([
         this._primitives = primitives;
         this._geometryUpdater = geometryUpdater;
         this._positions = [];
-    };
 
-    var generateCartesianArcOptions = {
-        positions : undefined,
-        granularity : undefined,
-        height : undefined
-    };
-
+        generateCartesianArcOptions.ellipsoid = geometryUpdater._scene.globe.ellipsoid;
+    }
     DynamicGeometryUpdater.prototype.update = function(time) {
         var geometryUpdater = this._geometryUpdater;
         var entity = geometryUpdater._entity;
         var polyline = entity.polyline;
         var line = this._line;
 
-        if (!entity.isAvailable(time) || !Property.getValueOrDefault(polyline._show, time, true)) {
+        if (!entity.isShowing || !entity.isAvailable(time) || !Property.getValueOrDefault(polyline._show, time, true)) {
             line.show = false;
             return;
         }
@@ -481,7 +501,7 @@ define([
         }
 
         line.show = true;
-        line.positions = positions;
+        line.positions = positions.slice();
         line.material = MaterialProperty.getValue(time, geometryUpdater.fillMaterialProperty, line.material);
         line.width = Property.getValueOrDefault(polyline._width, time, 1);
     };

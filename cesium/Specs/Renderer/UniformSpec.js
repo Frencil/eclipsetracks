@@ -17,8 +17,7 @@ defineSuite([
         Matrix3,
         Matrix4,
         createContext) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     var context;
 

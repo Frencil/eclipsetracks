@@ -17,6 +17,7 @@ defineSuite([
         'DataSources/SampledProperty',
         'DataSources/TimeIntervalCollectionProperty',
         'Scene/PrimitiveCollection',
+        'Scene/ShadowMode',
         'Specs/createDynamicGeometryBoundingSphereSpecs',
         'Specs/createDynamicProperty',
         'Specs/createScene'
@@ -38,11 +39,11 @@ defineSuite([
         SampledProperty,
         TimeIntervalCollectionProperty,
         PrimitiveCollection,
+        ShadowMode,
         createDynamicGeometryBoundingSphereSpecs,
         createDynamicProperty,
         createScene) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     var scene;
     var time;
@@ -79,6 +80,7 @@ defineSuite([
         expect(updater.hasConstantOutline).toBe(true);
         expect(updater.outlineColorProperty).toBe(undefined);
         expect(updater.outlineWidth).toBe(1.0);
+        expect(updater.shadowsProperty).toBe(undefined);
         expect(updater.isDynamic).toBe(false);
         expect(updater.isOutlineVisible(time)).toBe(false);
         expect(updater.isFilled(time)).toBe(false);
@@ -119,6 +121,7 @@ defineSuite([
         expect(updater.hasConstantOutline).toBe(true);
         expect(updater.outlineColorProperty).toBe(undefined);
         expect(updater.outlineWidth).toBe(1.0);
+        expect(updater.shadowsProperty).toEqual(new ConstantProperty(ShadowMode.DISABLED));
         expect(updater.isDynamic).toBe(false);
     });
 
@@ -163,7 +166,7 @@ defineSuite([
         if (options.fill) {
             instance = updater.createFillGeometryInstance(time);
             geometry = instance.geometry;
-            expect(geometry._maximumCorner).toEqual(Cartesian3.multiplyByScalar(options.dimensions, 0.5, new Cartesian3()));
+            expect(geometry._maximum).toEqual(Cartesian3.multiplyByScalar(options.dimensions, 0.5, new Cartesian3()));
 
             attributes = instance.attributes;
             if (options.material instanceof ColorMaterialProperty) {
@@ -275,6 +278,26 @@ defineSuite([
         expect(attributes.show.value).toEqual(ShowGeometryInstanceAttribute.toValue(outline.getValue(time2)));
     });
 
+    it('createFillGeometryInstance obeys Entity.show is false.', function() {
+        var entity = createBasicBox();
+        entity.show = false;
+        entity.box.fill = true;
+        var updater = new BoxGeometryUpdater(entity, scene);
+        var instance = updater.createFillGeometryInstance(new JulianDate());
+        var attributes = instance.attributes;
+        expect(attributes.show.value).toEqual(ShowGeometryInstanceAttribute.toValue(false));
+    });
+
+    it('createOutlineGeometryInstance obeys Entity.show is false.', function() {
+        var entity = createBasicBox();
+        entity.show = false;
+        entity.box.outline = true;
+        var updater = new BoxGeometryUpdater(entity, scene);
+        var instance = updater.createFillGeometryInstance(new JulianDate());
+        var attributes = instance.attributes;
+        expect(attributes.show.value).toEqual(ShowGeometryInstanceAttribute.toValue(false));
+    });
+
     it('dynamic updater sets properties', function() {
         var entity = new Entity();
         entity.position = new ConstantPositionProperty(Cartesian3.fromDegrees(0, 0, 0));
@@ -297,6 +320,11 @@ defineSuite([
 
         expect(dynamicUpdater._options.id).toBe(entity);
         expect(dynamicUpdater._options.dimensions).toEqual(box.dimensions.getValue());
+
+        entity.show = false;
+        dynamicUpdater.update(JulianDate.now());
+        expect(primitives.length).toBe(0);
+        entity.show = true;
 
         box.show.setValue(false);
         dynamicUpdater.update(JulianDate.now());
@@ -347,20 +375,20 @@ defineSuite([
         updater.geometryChanged.addEventListener(listener);
 
         entity.box.dimensions = new ConstantProperty();
-        expect(listener.callCount).toEqual(1);
+        expect(listener.calls.count()).toEqual(1);
 
         entity.availability = new TimeIntervalCollection();
-        expect(listener.callCount).toEqual(2);
+        expect(listener.calls.count()).toEqual(2);
 
         entity.box.dimensions = undefined;
-        expect(listener.callCount).toEqual(3);
+        expect(listener.calls.count()).toEqual(3);
 
         //Since there's no valid geometry, changing another property should not raise the event.
         entity.box.height = undefined;
 
         //Modifying an unrelated property should not have any effect.
         entity.viewFrom = new ConstantProperty(Cartesian3.UNIT_X);
-        expect(listener.callCount).toEqual(3);
+        expect(listener.calls.count()).toEqual(3);
     });
 
     it('createFillGeometryInstance throws if object is not filled', function() {
@@ -442,4 +470,4 @@ defineSuite([
     createDynamicGeometryBoundingSphereSpecs(BoxGeometryUpdater, entity, entity.box, function() {
         return scene;
     });
-});
+}, 'WebGL');

@@ -1,4 +1,4 @@
-/*global define,console*/
+/*global define*/
 define([
         '../../Core/buildModuleUrl',
         '../../Core/Cartesian3',
@@ -10,6 +10,7 @@ define([
         '../../Core/destroyObject',
         '../../Core/DeveloperError',
         '../../Core/Ellipsoid',
+        '../../Core/FeatureDetection',
         '../../Core/formatError',
         '../../Core/requestAnimationFrame',
         '../../Core/ScreenSpaceEventHandler',
@@ -18,6 +19,7 @@ define([
         '../../Scene/Moon',
         '../../Scene/Scene',
         '../../Scene/SceneMode',
+        '../../Scene/ShadowMode',
         '../../Scene/SkyAtmosphere',
         '../../Scene/SkyBox',
         '../../Scene/Sun',
@@ -33,6 +35,7 @@ define([
         destroyObject,
         DeveloperError,
         Ellipsoid,
+        FeatureDetection,
         formatError,
         requestAnimationFrame,
         ScreenSpaceEventHandler,
@@ -41,11 +44,12 @@ define([
         Moon,
         Scene,
         SceneMode,
+        ShadowMode,
         SkyAtmosphere,
         SkyBox,
         Sun,
         getElement) {
-    "use strict";
+    'use strict';
 
     function getDefaultSkyBoxUrl(suffix) {
         return buildModuleUrl('Assets/Textures/SkyBox/tycho2t3_80_' + suffix + '.jpg');
@@ -98,13 +102,16 @@ define([
         var canvas = widget._canvas;
         var width = canvas.clientWidth;
         var height = canvas.clientHeight;
-        var zoomFactor = defaultValue(window.devicePixelRatio, 1.0) * widget._resolutionScale;
+        var resolutionScale = widget._resolutionScale;
+        if (!widget._supportsImageRenderingPixelated) {
+            resolutionScale *= defaultValue(window.devicePixelRatio, 1.0);
+        }
 
         widget._canvasWidth = width;
         widget._canvasHeight = height;
 
-        width *= zoomFactor;
-        height *= zoomFactor;
+        width *= resolutionScale;
+        height *= resolutionScale;
 
         canvas.width = width;
         canvas.height = height;
@@ -138,19 +145,25 @@ define([
      * @param {Element|String} container The DOM element or ID that will contain the widget.
      * @param {Object} [options] Object with the following properties:
      * @param {Clock} [options.clock=new Clock()] The clock to use to control current time.
-     * @param {ImageryProvider} [options.imageryProvider=new BingMapsImageryProvider()] The imagery provider to serve as the base layer. If set to false, no imagery provider will be added.
+     * @param {ImageryProvider} [options.imageryProvider=new BingMapsImageryProvider()] The imagery provider to serve as the base layer. If set to <code>false</code>, no imagery provider will be added.
      * @param {TerrainProvider} [options.terrainProvider=new EllipsoidTerrainProvider] The terrain provider.
-     * @param {SkyBox} [options.skyBox] The skybox used to render the stars.  When <code>undefined</code>, the default stars are used.
+     * @param {SkyBox} [options.skyBox] The skybox used to render the stars.  When <code>undefined</code>, the default stars are used. If set to <code>false</code>, no skyBox, Sun, or Moon will be added.
+     * @param {SkyAtmosphere} [options.skyAtmosphere] Blue sky, and the glow around the Earth's limb.  Set to <code>false</code> to turn it off.
      * @param {SceneMode} [options.sceneMode=SceneMode.SCENE3D] The initial scene mode.
      * @param {Boolean} [options.scene3DOnly=false] When <code>true</code>, each geometry instance will only be rendered in 3D to save GPU memory.
      * @param {Boolean} [options.orderIndependentTranslucency=true] If true and the configuration supports it, use order independent translucency.
      * @param {MapProjection} [options.mapProjection=new GeographicProjection()] The map projection to use in 2D and Columbus View modes.
+     * @param {Globe} [options.globe=new Globe(mapProjection.ellipsoid)] The globe to use in the scene.  If set to <code>false</code>, no globe will be added.
      * @param {Boolean} [options.useDefaultRenderLoop=true] True if this widget should control the render loop, false otherwise.
      * @param {Number} [options.targetFrameRate] The target frame rate when using the default render loop.
      * @param {Boolean} [options.showRenderLoopErrors=true] If true, this widget will automatically display an HTML panel to the user containing the error, if a render loop error occurs.
      * @param {Object} [options.contextOptions] Context and WebGL creation properties corresponding to <code>options</code> passed to {@link Scene}.
      * @param {Element|String} [options.creditContainer] The DOM element or ID that will contain the {@link CreditDisplay}.  If not specified, the credits are added
      *        to the bottom of the widget itself.
+     * @param {Number} [options.terrainExaggeration=1.0] A scalar used to exaggerate the terrain. Note that terrain exaggeration will not modify any other primitive as they are positioned relative to the ellipsoid.
+     * @param {Boolean} [options.shadows=false] Determines if shadows are cast by the sun.
+     * @param {ShadowMode} [options.terrainShadows=ShadowMode.RECEIVE_ONLY] Determines if the terrain casts or receives shadows from the sun.
+     * @param {MapMode2D} [options.mapMode2D=MapMode2D.INFINITE_SCROLL] Determines if the 2D map is rotatable or can be scrolled infinitely in the horizontal direction.
      *
      * @exception {DeveloperError} Element with id "container" does not exist in the document.
      *
@@ -165,9 +178,9 @@ define([
      *
      * //Widget with OpenStreetMaps imagery provider and Cesium terrain provider hosted by AGI.
      * var widget = new Cesium.CesiumWidget('cesiumContainer', {
-     *     imageryProvider : new Cesium.OpenStreetMapImageryProvider(),
+     *     imageryProvider : Cesium.createOpenStreetMapImageryProvider(),
      *     terrainProvider : new Cesium.CesiumTerrainProvider({
-     *         url : '//cesiumjs.org/stk-terrain/world'
+     *         url : 'https://assets.agi.com/stk-terrain/world'
      *     }),
      *     // Use high-res stars downloaded from https://github.com/AnalyticalGraphicsInc/cesium-assets
      *     skyBox : new Cesium.SkyBox({
@@ -185,7 +198,7 @@ define([
      *     mapProjection : new Cesium.WebMercatorProjection()
      * });
      */
-    var CesiumWidget = function(container, options) {
+    function CesiumWidget(container, options) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(container)) {
             throw new DeveloperError('container is required.');
@@ -202,6 +215,12 @@ define([
         container.appendChild(element);
 
         var canvas = document.createElement('canvas');
+        var supportsImageRenderingPixelated = FeatureDetection.supportsImageRenderingPixelated();
+        this._supportsImageRenderingPixelated = supportsImageRenderingPixelated;
+        if (supportsImageRenderingPixelated) {
+            canvas.style.imageRendering = FeatureDetection.imageRenderingValue();
+        }
+
         canvas.oncontextmenu = function() {
             return false;
         };
@@ -216,6 +235,8 @@ define([
         var creditContainerContainer = defined(options.creditContainer) ? getElement(options.creditContainer) : element;
         creditContainerContainer.appendChild(creditContainer);
 
+        var showRenderLoopErrors = defaultValue(options.showRenderLoopErrors, true);
+
         this._element = element;
         this._container = container;
         this._canvas = canvas;
@@ -224,7 +245,7 @@ define([
         this._creditContainer = creditContainer;
         this._canRender = false;
         this._renderLoopRunning = false;
-        this._showRenderLoopErrors = defaultValue(options.showRenderLoopErrors, true);
+        this._showRenderLoopErrors = showRenderLoopErrors;
         this._resolutionScale = 1.0;
         this._forceResize = false;
         this._clock = defined(options.clock) ? options.clock : new Clock();
@@ -238,7 +259,10 @@ define([
                 creditContainer : creditContainer,
                 mapProjection : options.mapProjection,
                 orderIndependentTranslucency : options.orderIndependentTranslucency,
-                scene3DOnly : defaultValue(options.scene3DOnly, false)
+                scene3DOnly : defaultValue(options.scene3DOnly, false),
+                terrainExaggeration : options.terrainExaggeration,
+                shadows : options.shadows,
+                mapMode2D : options.mapMode2D
             });
             this._scene = scene;
 
@@ -246,15 +270,20 @@ define([
 
             configureCameraFrustum(this);
 
-            var ellipsoid = Ellipsoid.WGS84;
+            var ellipsoid = defaultValue(scene.mapProjection.ellipsoid, Ellipsoid.WGS84);
             var creditDisplay = scene.frameState.creditDisplay;
 
             var cesiumCredit = new Credit('Cesium', cesiumLogoData, 'http://cesiumjs.org/');
             creditDisplay.addDefaultCredit(cesiumCredit);
 
-            var globe = new Globe(ellipsoid);
-            this._globe = globe;
-            scene.globe = globe;
+            var globe = options.globe;
+            if (!defined(globe)) {
+                globe = new Globe(ellipsoid);
+            }
+            if (globe !== false) {
+                scene.globe = globe;
+                scene.globe.shadows = defaultValue(options.terrainShadows, ShadowMode.RECEIVE_ONLY);
+            }
 
             var skyBox = options.skyBox;
             if (!defined(skyBox)) {
@@ -269,17 +298,26 @@ define([
                     }
                 });
             }
+            if (skyBox !== false) {
+                scene.skyBox = skyBox;
+                scene.sun = new Sun();
+                scene.moon = new Moon();
+            }
 
-            scene.skyBox = skyBox;
-            scene.skyAtmosphere = new SkyAtmosphere(ellipsoid);
-            scene.sun = new Sun();
-            scene.moon = new Moon();
+            // Blue sky, and the glow around the Earth's limb.
+            var skyAtmosphere = options.skyAtmosphere;
+            if (!defined(skyAtmosphere)) {
+                skyAtmosphere = new SkyAtmosphere(ellipsoid);
+            }
+            if (skyAtmosphere !== false) {
+                scene.skyAtmosphere = skyAtmosphere;
+            }
 
             //Set the base imagery layer
-            var imageryProvider = options.imageryProvider;
+            var imageryProvider = (options.globe === false) ? false : options.imageryProvider;
             if (!defined(imageryProvider)) {
                 imageryProvider = new BingMapsImageryProvider({
-                    url : '//dev.virtualearth.net'
+                    url : 'https://dev.virtualearth.net'
                 });
             }
 
@@ -288,7 +326,7 @@ define([
             }
 
             //Set the terrain provider if one is provided.
-            if (defined(options.terrainProvider)) {
+            if (defined(options.terrainProvider) && options.globe !== false) {
                 scene.terrainProvider = options.terrainProvider;
             }
 
@@ -319,12 +357,14 @@ define([
                 }
             });
         } catch (error) {
-            var title = 'Error constructing CesiumWidget.';
-            var message = 'Visit <a href="http://get.webgl.org">http://get.webgl.org</a> to verify that your web browser and hardware support WebGL.  Consider trying a different web browser or updating your video drivers.  Detailed error information is below:';
-            this.showErrorPanel(title, message, error);
+            if (showRenderLoopErrors) {
+                var title = 'Error constructing CesiumWidget.';
+                var message = 'Visit <a href="http://get.webgl.org">http://get.webgl.org</a> to verify that your web browser and hardware support WebGL.  Consider trying a different web browser or updating your video drivers.  Detailed error information is below:';
+                this.showErrorPanel(title, message, error);
+            }
             throw error;
         }
-    };
+    }
 
     defineProperties(CesiumWidget.prototype, {
         /**
@@ -377,7 +417,7 @@ define([
 
         /**
          * Gets the collection of image layers that will be rendered on the globe.
-         * @memberof Viewer.prototype
+         * @memberof CesiumWidget.prototype
          *
          * @type {ImageryLayerCollection}
          * @readonly
@@ -443,8 +483,8 @@ define([
         /**
          * Gets or sets the target frame rate of the widget when <code>useDefaultRenderLoop</code>
          * is true. If undefined, the browser's {@link requestAnimationFrame} implementation
-         * determines the frame rate.  This value must be greater than 0 and a value higher than
-         * the underlying requestAnimationFrame implementatin will have no affect.
+         * determines the frame rate.  If defined, this value must be greater than 0.  A value higher
+         * than the underlying requestAnimationFrame implementation will have no effect.
          * @memberof CesiumWidget.prototype
          *
          * @type {Number}
@@ -455,7 +495,7 @@ define([
             },
             set : function(value) {
                 if (value <= 0) {
-                    throw new DeveloperError('targetFrameRate must be greater than 0.');
+                    throw new DeveloperError('targetFrameRate must be greater than 0, or undefined.');
                 }
                 this._targetFrameRate = value;
             }
@@ -542,9 +582,9 @@ define([
         var errorPanelScroller = document.createElement('div');
         errorPanelScroller.className = 'cesium-widget-errorPanel-scroll';
         content.appendChild(errorPanelScroller);
-        var resizeCallback = function() {
+        function resizeCallback() {
             errorPanelScroller.style.maxHeight = Math.max(Math.round(element.clientHeight * 0.9 - 100), 30) + 'px';
-        };
+        }
         resizeCallback();
         if (defined(window.addEventListener)) {
             window.addEventListener('resize', resizeCallback, false);
@@ -586,7 +626,10 @@ define([
 
         element.appendChild(overlay);
 
-        console.error(title + '\n' + message + '\n' + errorDetails);
+        //IE8 does not have a console object unless the dev tools are open.
+        if (typeof console !== 'undefined') {
+            console.error(title + '\n' + message + '\n' + errorDetails);
+        }
     };
 
     /**
@@ -629,10 +672,12 @@ define([
      * unless <code>useDefaultRenderLoop</code> is set to false;
      */
     CesiumWidget.prototype.render = function() {
-        this._scene.initializeFrame();
-        var currentTime = this._clock.tick();
         if (this._canRender) {
+            this._scene.initializeFrame();
+            var currentTime = this._clock.tick();
             this._scene.render(currentTime);
+        } else {
+            this._clock.tick();
         }
     };
 

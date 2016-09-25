@@ -3,7 +3,7 @@ define([
         './SceneMode'
     ], function(
         SceneMode) {
-    "use strict";
+    'use strict';
 
     /**
      * State information about the current frame.  An instance of this class
@@ -16,7 +16,25 @@ define([
      *
      * @private
      */
-    var FrameState = function(creditDisplay) {
+    function FrameState(context, creditDisplay) {
+        /**
+         * The rendering context.
+         * @type {Context}
+         */
+        this.context = context;
+
+        /**
+         * An array of rendering commands.
+         * @type {DrawCommand[]}
+         */
+        this.commandList = [];
+
+        /**
+         * An array of shadow maps.
+         * @type {ShadowMap[]}
+         */
+        this.shadowMaps = [];
+
         /**
          * The current mode of the scene.
          * @type {SceneMode}
@@ -123,7 +141,83 @@ define([
          * @default false
          */
         this.scene3DOnly = false;
-    };
+
+        this.fog = {
+            /**
+             * <code>true</code> if fog is enabled, <code>false</code> otherwise.
+             * @type {Boolean}
+             * @default false
+             */
+            enabled : false,
+            /**
+             * A positive number used to mix the color and fog color based on camera distance.
+             * @type {Number}
+             * @default undefined
+             */
+            density : undefined,
+            /**
+             * A scalar used to modify the screen space error of geometry partially in fog.
+             * @type {Number}
+             * @default undefined
+             */
+            sse : undefined
+        };
+
+        /**
+        * A scalar used to exaggerate the terrain.
+        * @type {Number}
+        */
+        this.terrainExaggeration = 1.0;
+
+        this.shadowHints = {
+            /**
+             * Whether there are any active shadow maps this frame.
+             * @type {Boolean}
+             */
+            shadowsEnabled : true,
+
+            /**
+             * All shadow maps that are enabled this frame.
+             */
+             shadowMaps : [],
+
+            /**
+             * Shadow maps that originate from light sources. Does not include shadow maps that are used for
+             * analytical purposes. Only these shadow maps will be used to generate receive shadows shaders.
+             */
+            lightShadowMaps : [],
+
+            /**
+             * The near plane of the scene's frustum commands. Used for fitting cascaded shadow maps.
+             * @type {Number}
+             */
+            nearPlane : 1.0,
+
+            /**
+             * The far plane of the scene's frustum commands. Used for fitting cascaded shadow maps.
+             * @type {Number}
+             */
+            farPlane : 5000.0,
+
+            /**
+             * The size of the bounding volume that is closest to the camera. This is used to place more shadow detail near the object.
+             * @type {Number}
+             */
+            closestObjectSize : 1000.0,
+
+            /**
+             * The time when a shadow map was last dirty
+             * @type {Number}
+             */
+            lastDirtyTime : 0,
+
+            /**
+             * Whether the shadows maps are out of view this frame
+             * @type {Boolean}
+             */
+            outOfView : true
+        };
+    }
 
     /**
      * A function that will be called at the end of the frame.

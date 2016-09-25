@@ -11,8 +11,7 @@ defineSuite([
         Cartesian3,
         Matrix4,
         createScene) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     var scene;
 
@@ -79,9 +78,9 @@ defineSuite([
             id : 'id'
         }));
 
-        var pick = scene.pick(new Cartesian2(0, 0));
-        expect(pick.primitive).toEqual(p);
-        expect(pick.id).toEqual('id');
+        var pick = scene.pickForSpecs();
+        expect(pick.primitive).toBe(p);
+        expect(pick.id).toBe('id');
     });
 
     it('isDestroyed', function() {

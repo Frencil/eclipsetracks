@@ -5,8 +5,7 @@ defineSuite([
     ], function(
         VertexFormat,
         createPackableSpecs) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     it('clone', function() {
         var vertexFormat = new VertexFormat({

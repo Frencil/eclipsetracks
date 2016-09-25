@@ -5,11 +5,13 @@ define([
         '../Core/Cartesian2',
         '../Core/Cartesian3',
         '../Core/Color',
+        '../Core/defaultValue',
         '../Core/defined',
         '../Core/destroyObject',
         '../Core/DeveloperError',
         '../Core/NearFarScalar',
         '../Scene/BillboardCollection',
+        '../Scene/HeightReference',
         '../Scene/HorizontalOrigin',
         '../Scene/VerticalOrigin',
         './BoundingSphereState',
@@ -20,25 +22,29 @@ define([
         Cartesian2,
         Cartesian3,
         Color,
+        defaultValue,
         defined,
         destroyObject,
         DeveloperError,
         NearFarScalar,
         BillboardCollection,
+        HeightReference,
         HorizontalOrigin,
         VerticalOrigin,
         BoundingSphereState,
         Property) {
-    "use strict";
+    'use strict';
 
     var defaultColor = Color.WHITE;
     var defaultEyeOffset = Cartesian3.ZERO;
+    var defaultHeightReference = HeightReference.NONE;
     var defaultPixelOffset = Cartesian2.ZERO;
     var defaultScale = 1.0;
     var defaultRotation = 0.0;
     var defaultAlignedAxis = Cartesian3.ZERO;
     var defaultHorizontalOrigin = HorizontalOrigin.CENTER;
     var defaultVerticalOrigin = VerticalOrigin.CENTER;
+    var defaultSizeInMeters = false;
 
     var position = new Cartesian3();
     var color = new Color();
@@ -49,11 +55,11 @@ define([
     var pixelOffsetScaleByDistance = new NearFarScalar();
     var boundingRectangle = new BoundingRectangle();
 
-    var EntityData = function(entity) {
+    function EntityData(entity) {
         this.entity = entity;
         this.billboard = undefined;
         this.textureValue = undefined;
-    };
+    }
 
     /**
      * A {@link Visualizer} which maps {@link Entity#billboard} to a {@link Billboard}.
@@ -63,7 +69,7 @@ define([
      * @param {Scene} scene The scene the primitives will be rendered in.
      * @param {EntityCollection} entityCollection The entityCollection to visualize.
      */
-    var BillboardVisualizer = function(scene, entityCollection) {
+    function BillboardVisualizer(scene, entityCollection) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(scene)) {
             throw new DeveloperError('scene is required.');
@@ -81,7 +87,7 @@ define([
         this._entityCollection = entityCollection;
         this._items = new AssociativeArray();
         this._onCollectionChanged(entityCollection, entityCollection.values, [], []);
-    };
+    }
 
     /**
      * Updates the primitives created by this visualizer to match their
@@ -105,7 +111,7 @@ define([
             var billboardGraphics = entity._billboard;
             var textureValue;
             var billboard = item.billboard;
-            var show = entity.isAvailable(time) && Property.getValueOrDefault(billboardGraphics._show, time, true);
+            var show = entity.isShowing && entity.isAvailable(time) && Property.getValueOrDefault(billboardGraphics._show, time, true);
 
             if (show) {
                 position = Property.getValueOrUndefined(entity._position, time, position);
@@ -122,9 +128,10 @@ define([
             if (!defined(billboard)) {
                 var billboardCollection = this._billboardCollection;
                 if (!defined(billboardCollection)) {
-                    billboardCollection = new BillboardCollection();
+                    billboardCollection = this._scene.primitives.add(new BillboardCollection({
+                        scene : this._scene
+                    }));
                     this._billboardCollection = billboardCollection;
-                    this._scene.primitives.add(billboardCollection);
                 }
 
                 var length = unusedIndexes.length;
@@ -147,6 +154,7 @@ define([
             billboard.position = position;
             billboard.color = Property.getValueOrDefault(billboardGraphics._color, time, defaultColor, color);
             billboard.eyeOffset = Property.getValueOrDefault(billboardGraphics._eyeOffset, time, defaultEyeOffset, eyeOffset);
+            billboard.heightReference = Property.getValueOrDefault(billboardGraphics._heightReference, time, defaultHeightReference);
             billboard.pixelOffset = Property.getValueOrDefault(billboardGraphics._pixelOffset, time, defaultPixelOffset, pixelOffset);
             billboard.scale = Property.getValueOrDefault(billboardGraphics._scale, time, defaultScale);
             billboard.rotation = Property.getValueOrDefault(billboardGraphics._rotation, time, defaultRotation);
@@ -158,6 +166,7 @@ define([
             billboard.scaleByDistance = Property.getValueOrUndefined(billboardGraphics._scaleByDistance, time, scaleByDistance);
             billboard.translucencyByDistance = Property.getValueOrUndefined(billboardGraphics._translucencyByDistance, time, translucencyByDistance);
             billboard.pixelOffsetScaleByDistance = Property.getValueOrUndefined(billboardGraphics._pixelOffsetScaleByDistance, time, pixelOffsetScaleByDistance);
+            billboard.sizeInMeters = Property.getValueOrDefault(billboardGraphics._sizeInMeters, defaultSizeInMeters);
 
             var subRegion = Property.getValueOrUndefined(billboardGraphics._imageSubRegion, time, boundingRectangle);
             if (defined(subRegion)) {
@@ -193,7 +202,15 @@ define([
             return BoundingSphereState.FAILED;
         }
 
-        result.center = Cartesian3.clone(item.billboard.position, result.center);
+        var billboard = item.billboard;
+        if (billboard.heightReference === HeightReference.NONE) {
+            result.center = Cartesian3.clone(billboard.position, result.center);
+        } else {
+            if (!defined(billboard._clampedPosition)) {
+                return BoundingSphereState.PENDING;
+            }
+            result.center = Cartesian3.clone(billboard._clampedPosition, result.center);
+        }
         result.radius = 0;
         return BoundingSphereState.DONE;
     };
@@ -256,6 +273,7 @@ define([
             if (defined(billboard)) {
                 item.textureValue = undefined;
                 item.billboard = undefined;
+                billboard.id = undefined;
                 billboard.show = false;
                 billboard.image = undefined;
                 unusedIndexes.push(billboard._index);

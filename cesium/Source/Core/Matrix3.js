@@ -3,6 +3,7 @@ define([
         './Cartesian3',
         './defaultValue',
         './defined',
+        './defineProperties',
         './DeveloperError',
         './freezeObject',
         './Math'
@@ -10,10 +11,11 @@ define([
         Cartesian3,
         defaultValue,
         defined,
+        defineProperties,
         DeveloperError,
         freezeObject,
         CesiumMath) {
-    "use strict";
+    'use strict';
 
     /**
      * A 3x3 matrix, indexable as a column-major order array.
@@ -39,7 +41,7 @@ define([
      * @see Matrix2
      * @see Matrix4
      */
-    var Matrix3 = function(column0Row0, column1Row0, column2Row0,
+    function Matrix3(column0Row0, column1Row0, column2Row0,
                            column0Row1, column1Row1, column2Row1,
                            column0Row2, column1Row2, column2Row2) {
         this[0] = defaultValue(column0Row0, 0.0);
@@ -51,7 +53,7 @@ define([
         this[6] = defaultValue(column2Row0, 0.0);
         this[7] = defaultValue(column2Row1, 0.0);
         this[8] = defaultValue(column2Row2, 0.0);
-    };
+    }
 
     /**
      * The number of elements used to pack the object into an array.
@@ -65,6 +67,8 @@ define([
      * @param {Matrix3} value The value to pack.
      * @param {Number[]} array The array to pack into.
      * @param {Number} [startingIndex=0] The index into the array at which to start packing the elements.
+     *
+     * @returns {Number[]} The array that was packed into
      */
     Matrix3.pack = function(value, array, startingIndex) {
         //>>includeStart('debug', pragmas.debug);
@@ -88,6 +92,8 @@ define([
         array[startingIndex++] = value[6];
         array[startingIndex++] = value[7];
         array[startingIndex++] = value[8];
+
+        return array;
     };
 
     /**
@@ -96,6 +102,7 @@ define([
      * @param {Number[]} array The packed array.
      * @param {Number} [startingIndex=0] The starting index of the element to be unpacked.
      * @param {Matrix3} [result] The object into which to store the result.
+     * @returns {Matrix3} The modified result parameter or a new Matrix3 instance if one was not provided.
      */
     Matrix3.unpack = function(array, startingIndex, result) {
         //>>includeStart('debug', pragmas.debug);
@@ -201,7 +208,7 @@ define([
      *
      * @param {Number[]} values The column-major order array.
      * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
-     * @returns The modified result parameter, or a new Matrix3 instance if one was not provided.
+     * @returns {Matrix3} The modified result parameter, or a new Matrix3 instance if one was not provided.
      */
     Matrix3.fromColumnMajorArray = function(values, result) {
         //>>includeStart('debug', pragmas.debug);
@@ -219,7 +226,7 @@ define([
      *
      * @param {Number[]} values The row-major order array.
      * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
-     * @returns The modified result parameter, or a new Matrix3 instance if one was not provided.
+     * @returns {Matrix3} The modified result parameter, or a new Matrix3 instance if one was not provided.
      */
     Matrix3.fromRowMajorArray = function(values, result) {
         //>>includeStart('debug', pragmas.debug);
@@ -249,6 +256,7 @@ define([
      * Computes a 3x3 rotation matrix from the provided quaternion.
      *
      * @param {Quaternion} quaternion the quaternion to use.
+     * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
      * @returns {Matrix3} The 3x3 rotation matrix from this quaternion.
      */
     Matrix3.fromQuaternion = function(quaternion, result) {
@@ -303,7 +311,7 @@ define([
      *
      * @param {Cartesian3} scale The x, y, and z scale factors.
      * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
-     * @returns The modified result parameter, or a new Matrix3 instance if one was not provided.
+     * @returns {Matrix3} The modified result parameter, or a new Matrix3 instance if one was not provided.
      *
      * @example
      * // Creates
@@ -343,7 +351,7 @@ define([
      *
      * @param {Number} scale The uniform scale factor.
      * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
-     * @returns The modified result parameter, or a new Matrix3 instance if one was not provided.
+     * @returns {Matrix3} The modified result parameter, or a new Matrix3 instance if one was not provided.
      *
      * @example
      * // Creates
@@ -383,7 +391,7 @@ define([
      *
      * @param {Cartesian3} the vector on the left hand side of the cross product operation.
      * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
-     * @returns The modified result parameter, or a new Matrix3 instance if one was not provided.
+     * @returns {Matrix3} The modified result parameter, or a new Matrix3 instance if one was not provided.
      *
      * @example
      * // Creates
@@ -423,7 +431,7 @@ define([
      *
      * @param {Number} angle The angle, in radians, of the rotation.  Positive angles are counterclockwise.
      * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
-     * @returns The modified result parameter, or a new Matrix3 instance if one was not provided.
+     * @returns {Matrix3} The modified result parameter, or a new Matrix3 instance if one was not provided.
      *
      * @example
      * // Rotate a point 45 degrees counterclockwise around the x-axis.
@@ -466,7 +474,7 @@ define([
      *
      * @param {Number} angle The angle, in radians, of the rotation.  Positive angles are counterclockwise.
      * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
-     * @returns The modified result parameter, or a new Matrix3 instance if one was not provided.
+     * @returns {Matrix3} The modified result parameter, or a new Matrix3 instance if one was not provided.
      *
      * @example
      * // Rotate a point 45 degrees counterclockwise around the y-axis.
@@ -509,7 +517,7 @@ define([
      *
      * @param {Number} angle The angle, in radians, of the rotation.  Positive angles are counterclockwise.
      * @param {Matrix3} [result] The object in which the result will be stored, if undefined a new instance will be created.
-     * @returns The modified result parameter, or a new Matrix3 instance if one was not provided.
+     * @returns {Matrix3} The modified result parameter, or a new Matrix3 instance if one was not provided.
      *
      * @example
      * // Rotate a point 45 degrees counterclockwise around the z-axis.
@@ -626,7 +634,7 @@ define([
             throw new DeveloperError('index must be 0, 1, or 2.');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -647,7 +655,7 @@ define([
      * @param {Matrix3} matrix The matrix to use.
      * @param {Number} index The zero-based index of the column to set.
      * @param {Cartesian3} cartesian The Cartesian whose values will be assigned to the specified column.
-     * @param {Cartesian3} result The object onto which to store the result.
+     * @param {Matrix3} result The object onto which to store the result.
      * @returns {Matrix3} The modified result parameter.
      *
      * @exception {DeveloperError} index must be 0, 1, or 2.
@@ -664,7 +672,7 @@ define([
             throw new DeveloperError('index must be 0, 1, or 2.');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -695,7 +703,7 @@ define([
             throw new DeveloperError('index must be 0, 1, or 2.');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -715,7 +723,7 @@ define([
      * @param {Matrix3} matrix The matrix to use.
      * @param {Number} index The zero-based index of the row to set.
      * @param {Cartesian3} cartesian The Cartesian whose values will be assigned to the specified row.
-     * @param {Cartesian3} result The object onto which to store the result.
+     * @param {Matrix3} result The object onto which to store the result.
      * @returns {Matrix3} The modified result parameter.
      *
      * @exception {DeveloperError} index must be 0, 1, or 2.
@@ -732,7 +740,7 @@ define([
             throw new DeveloperError('index must be 0, 1, or 2.');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -758,7 +766,7 @@ define([
             throw new DeveloperError('matrix is required.');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -799,7 +807,7 @@ define([
             throw new DeveloperError('right is required');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -844,7 +852,7 @@ define([
             throw new DeveloperError('right is required');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -877,7 +885,7 @@ define([
             throw new DeveloperError('right is required');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -910,7 +918,7 @@ define([
             throw new DeveloperError('cartesian is required');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -945,7 +953,7 @@ define([
             throw new DeveloperError('scalar must be a number');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -962,6 +970,47 @@ define([
     };
 
     /**
+     * Computes the product of a matrix times a (non-uniform) scale, as if the scale were a scale matrix.
+     *
+     * @param {Matrix3} matrix The matrix on the left-hand side.
+     * @param {Cartesian3} scale The non-uniform scale on the right-hand side.
+     * @param {Matrix3} result The object onto which to store the result.
+     * @returns {Matrix3} The modified result parameter.
+     *
+     *
+     * @example
+     * // Instead of Cesium.Matrix3.multiply(m, Cesium.Matrix3.fromScale(scale), m);
+     * Cesium.Matrix3.multiplyByScale(m, scale, m);
+     *
+     * @see Matrix3.fromScale
+     * @see Matrix3.multiplyByUniformScale
+     */
+    Matrix3.multiplyByScale = function(matrix, scale, result) {
+        //>>includeStart('debug', pragmas.debug);
+        if (!defined(matrix)) {
+            throw new DeveloperError('matrix is required');
+        }
+        if (!defined(scale)) {
+            throw new DeveloperError('scale is required');
+        }
+        if (!defined(result)) {
+            throw new DeveloperError('result is required');
+        }
+        //>>includeEnd('debug');
+
+        result[0] = matrix[0] * scale.x;
+        result[1] = matrix[1] * scale.x;
+        result[2] = matrix[2] * scale.x;
+        result[3] = matrix[3] * scale.y;
+        result[4] = matrix[4] * scale.y;
+        result[5] = matrix[5] * scale.y;
+        result[6] = matrix[6] * scale.z;
+        result[7] = matrix[7] * scale.z;
+        result[8] = matrix[8] * scale.z;
+        return result;
+    };
+
+    /**
      * Creates a negated copy of the provided matrix.
      *
      * @param {Matrix3} matrix The matrix to negate.
@@ -974,7 +1023,7 @@ define([
             throw new DeveloperError('matrix is required');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -1003,7 +1052,7 @@ define([
             throw new DeveloperError('matrix is required');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -1198,7 +1247,7 @@ define([
             throw new DeveloperError('matrix is required');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -1256,7 +1305,7 @@ define([
             throw new DeveloperError('matrix is required');
         }
         if (!defined(result)) {
-            throw new DeveloperError('result is required,');
+            throw new DeveloperError('result is required');
         }
         //>>includeEnd('debug');
 
@@ -1355,6 +1404,16 @@ define([
                                                 0.0, 0.0, 1.0));
 
     /**
+     * An immutable Matrix3 instance initialized to the zero matrix.
+     *
+     * @type {Matrix3}
+     * @constant
+     */
+    Matrix3.ZERO = freezeObject(new Matrix3(0.0, 0.0, 0.0,
+                                            0.0, 0.0, 0.0,
+                                            0.0, 0.0, 0.0));
+
+    /**
      * The index into Matrix3 for column 0, row 0.
      *
      * @type {Number}
@@ -1425,6 +1484,20 @@ define([
      * @constant
      */
     Matrix3.COLUMN2ROW2 = 8;
+
+    defineProperties(Matrix3.prototype, {
+        /**
+         * Gets the number of items in the collection.
+         * @memberof Matrix3.prototype
+         *
+         * @type {Number}
+         */
+        length : {
+            get : function() {
+                return Matrix3.packedLength;
+            }
+        }
+    });
 
     /**
      * Duplicates the provided Matrix3 instance.

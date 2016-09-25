@@ -4,10 +4,12 @@ define([
         '../Core/Cartesian2',
         '../Core/Cartesian3',
         '../Core/Color',
+        '../Core/defaultValue',
         '../Core/defined',
         '../Core/destroyObject',
         '../Core/DeveloperError',
         '../Core/NearFarScalar',
+        '../Scene/HeightReference',
         '../Scene/HorizontalOrigin',
         '../Scene/LabelCollection',
         '../Scene/LabelStyle',
@@ -19,26 +21,29 @@ define([
         Cartesian2,
         Cartesian3,
         Color,
+        defaultValue,
         defined,
         destroyObject,
         DeveloperError,
         NearFarScalar,
+        HeightReference,
         HorizontalOrigin,
         LabelCollection,
         LabelStyle,
         VerticalOrigin,
         BoundingSphereState,
         Property) {
-    "use strict";
+    'use strict';
 
     var defaultScale = 1.0;
     var defaultFont = '30px sans-serif';
     var defaultStyle = LabelStyle.FILL;
     var defaultFillColor = Color.WHITE;
     var defaultOutlineColor = Color.BLACK;
-    var defaultOutlineWidth = 1;
+    var defaultOutlineWidth = 1.0;
     var defaultPixelOffset = Cartesian2.ZERO;
     var defaultEyeOffset = Cartesian3.ZERO;
+    var defaultHeightReference = HeightReference.NONE;
     var defaultHorizontalOrigin = HorizontalOrigin.CENTER;
     var defaultVerticalOrigin = VerticalOrigin.CENTER;
 
@@ -50,11 +55,11 @@ define([
     var translucencyByDistance = new NearFarScalar();
     var pixelOffsetScaleByDistance = new NearFarScalar();
 
-    var EntityData = function(entity) {
+    function EntityData(entity) {
         this.entity = entity;
         this.label = undefined;
         this.index = undefined;
-    };
+    }
 
     /**
      * A {@link Visualizer} which maps the {@link LabelGraphics} instance
@@ -65,7 +70,7 @@ define([
      * @param {Scene} scene The scene the primitives will be rendered in.
      * @param {EntityCollection} entityCollection The entityCollection to visualize.
      */
-    var LabelVisualizer = function(scene, entityCollection) {
+    function LabelVisualizer(scene, entityCollection) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(scene)) {
             throw new DeveloperError('scene is required.');
@@ -84,7 +89,7 @@ define([
         this._items = new AssociativeArray();
 
         this._onCollectionChanged(entityCollection, entityCollection.values, [], []);
-    };
+    }
 
     /**
      * Updates the primitives created by this visualizer to match their
@@ -108,7 +113,7 @@ define([
             var labelGraphics = entity._label;
             var text;
             var label = item.label;
-            var show = entity.isAvailable(time) && Property.getValueOrDefault(labelGraphics._show, time, true);
+            var show = entity.isShowing && entity.isAvailable(time) && Property.getValueOrDefault(labelGraphics._show, time, true);
 
             if (show) {
                 position = Property.getValueOrUndefined(entity._position, time, position);
@@ -125,9 +130,10 @@ define([
             if (!defined(label)) {
                 var labelCollection = this._labelCollection;
                 if (!defined(labelCollection)) {
-                    labelCollection = new LabelCollection();
+                    labelCollection = this._scene.primitives.add(new LabelCollection({
+                        scene : this._scene
+                    }));
                     this._labelCollection = labelCollection;
-                    this._scene.primitives.add(labelCollection);
                 }
 
                 var length = unusedIndexes.length;
@@ -154,6 +160,7 @@ define([
             label.outlineWidth = Property.getValueOrDefault(labelGraphics._outlineWidth, time, defaultOutlineWidth);
             label.pixelOffset = Property.getValueOrDefault(labelGraphics._pixelOffset, time, defaultPixelOffset, pixelOffset);
             label.eyeOffset = Property.getValueOrDefault(labelGraphics._eyeOffset, time, defaultEyeOffset, eyeOffset);
+            label.heightReference = Property.getValueOrDefault(labelGraphics._heightReference, time, defaultHeightReference);
             label.horizontalOrigin = Property.getValueOrDefault(labelGraphics._horizontalOrigin, time, defaultHorizontalOrigin);
             label.verticalOrigin = Property.getValueOrDefault(labelGraphics._verticalOrigin, time, defaultVerticalOrigin);
             label.translucencyByDistance = Property.getValueOrUndefined(labelGraphics._translucencyByDistance, time, translucencyByDistance);
@@ -188,7 +195,8 @@ define([
             return BoundingSphereState.FAILED;
         }
 
-        result.center = Cartesian3.clone(item.label.position, result.center);
+        var label = item.label;
+        result.center = Cartesian3.clone(defaultValue(label._clampedPosition, label.position), result.center);
         result.radius = 0;
         return BoundingSphereState.DONE;
     };
@@ -250,6 +258,7 @@ define([
             var label = item.label;
             if (defined(label)) {
                 unusedIndexes.push(item.index);
+                label.id = undefined;
                 label.show = false;
                 item.label = undefined;
                 item.index = -1;

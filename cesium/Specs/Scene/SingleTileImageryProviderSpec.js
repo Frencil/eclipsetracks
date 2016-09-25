@@ -2,6 +2,7 @@
 defineSuite([
         'Scene/SingleTileImageryProvider',
         'Core/DefaultProxy',
+        'Core/Ellipsoid',
         'Core/GeographicTilingScheme',
         'Core/loadImage',
         'Core/Rectangle',
@@ -9,10 +10,12 @@ defineSuite([
         'Scene/ImageryLayer',
         'Scene/ImageryProvider',
         'Scene/ImageryState',
-        'Specs/waitsForPromise'
+        'Specs/pollToPromise',
+        'ThirdParty/when'
     ], function(
         SingleTileImageryProvider,
         DefaultProxy,
+        Ellipsoid,
         GeographicTilingScheme,
         loadImage,
         Rectangle,
@@ -20,9 +23,9 @@ defineSuite([
         ImageryLayer,
         ImageryProvider,
         ImageryState,
-        waitsForPromise) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+        pollToPromise,
+        when) {
+    'use strict';
 
     afterEach(function() {
         loadImage.createImage = loadImage.defaultCreateImage;
@@ -32,16 +35,38 @@ defineSuite([
         expect(SingleTileImageryProvider).toConformToInterface(ImageryProvider);
     });
 
+    it('resolves readyPromise', function() {
+        var provider = new SingleTileImageryProvider({
+            url : 'Data/Images/Red16x16.png'
+        });
+
+        return provider.readyPromise.then(function(result) {
+            expect(result).toBe(true);
+            expect(provider.ready).toBe(true);
+        });
+    });
+
+    it('rejects readyPromise on error', function() {
+        var provider = new SingleTileImageryProvider({
+            url : 'invalid.image.url'
+        });
+
+        return provider.readyPromise.then(function() {
+            fail('should not resolve');
+        }).otherwise(function (e) {
+            expect(provider.ready).toBe(false);
+            expect(e.message).toContain(provider.url);
+        });
+    });
+
     it('returns valid value for hasAlphaChannel', function() {
         var provider = new SingleTileImageryProvider({
             url : 'Data/Images/Red16x16.png'
         });
 
-        waitsFor(function() {
+        return pollToPromise(function() {
             return provider.ready;
-        }, 'imagery provider to become ready');
-
-        runs(function() {
+        }).then(function() {
             expect(typeof provider.hasAlphaChannel).toBe('boolean');
         });
     });
@@ -60,11 +85,9 @@ defineSuite([
         expect(provider.rectangle).toEqual(rectangle);
         expect(provider.hasAlphaChannel).toEqual(true);
 
-        waitsFor(function() {
+        return pollToPromise(function() {
             return provider.ready;
-        }, 'imagery provider to become ready');
-
-        runs(function() {
+        }).then(function() {
             expect(provider.tilingScheme).toBeInstanceOf(GeographicTilingScheme);
             expect(provider.tilingScheme.rectangle).toEqual(rectangle);
             expect(provider.tileWidth).toEqual(16);
@@ -81,10 +104,24 @@ defineSuite([
         expect(constructWithoutUrl).toThrowDeveloperError();
     });
 
+    it('can use a custom ellipsoid', function() {
+        var ellipsoid = new Ellipsoid(1, 2, 3);
+        var provider = new SingleTileImageryProvider({
+            url : 'Data/Images/Red16x16.png',
+            ellipsoid : ellipsoid
+        });
+
+        return pollToPromise(function() {
+            return provider.ready;
+        }).then(function() {
+            expect(provider.tilingScheme.ellipsoid).toEqual(ellipsoid);
+        });
+    });
+
     it('requests the single image immediately upon construction', function() {
         var imageUrl = 'Data/Images/Red16x16.png';
 
-        spyOn(loadImage, 'createImage').andCallFake(function(url, crossOrigin, deferred) {
+        spyOn(loadImage, 'createImage').and.callFake(function(url, crossOrigin, deferred) {
             expect(url).toEqual(imageUrl);
             loadImage.defaultCreateImage(url, crossOrigin, deferred);
         });
@@ -95,12 +132,10 @@ defineSuite([
 
         expect(loadImage.createImage).toHaveBeenCalled();
 
-        waitsFor(function() {
+        return pollToPromise(function() {
             return provider.ready;
-        }, 'imagery provider to become ready');
-
-        runs(function() {
-            waitsForPromise(provider.requestImage(0, 0, 0), function(image) {
+        }).then(function() {
+            return when(provider.requestImage(0, 0, 0), function(image) {
                 expect(image).toBeInstanceOf(Image);
             });
         });
@@ -111,34 +146,28 @@ defineSuite([
             url : 'Data/Images/Red16x16.png'
         });
 
-        waitsFor(function() {
+        return pollToPromise(function() {
             return provider.ready;
-        }, 'imagery provider to become ready');
-
-        var providerWithCredit;
-
-        runs(function() {
+        }).then(function() {
             expect(provider.credit).toBeUndefined();
 
-            providerWithCredit = new SingleTileImageryProvider({
+            var providerWithCredit = new SingleTileImageryProvider({
                 url : 'Data/Images/Red16x16.png',
                 credit : 'Thanks to our awesome made up source of this imagery!'
             });
-        });
 
-        waitsFor(function() {
-            return providerWithCredit.ready;
-        }, 'imagery provider to become ready');
-
-        runs(function() {
-            expect(providerWithCredit.credit).toBeDefined();
+            return pollToPromise(function() {
+                return providerWithCredit.ready;
+            }).then(function() {
+                expect(providerWithCredit.credit).toBeDefined();
+            });
         });
     });
 
     it('routes requests through a proxy if one is specified', function() {
         var imageUrl = 'Data/Images/Red16x16.png';
 
-        spyOn(loadImage, 'createImage').andCallFake(function(url, crossOrigin, deferred) {
+        spyOn(loadImage, 'createImage').and.callFake(function(url, crossOrigin, deferred) {
             expect(url.indexOf(proxy.getURL('Data/Images/Red16x16.png'))).toEqual(0);
             loadImage.defaultCreateImage(url, crossOrigin, deferred);
         });
@@ -183,25 +212,20 @@ defineSuite([
             }
         };
 
-        waitsFor(function() {
+        return pollToPromise(function() {
             return provider.ready;
-        }, 'imagery provider to become ready');
-
-        var imagery;
-        runs(function() {
-            imagery = new Imagery(layer, 0, 0, 0);
+        }).then(function() {
+            var imagery = new Imagery(layer, 0, 0, 0);
             imagery.addReference();
             layer._requestImagery(imagery);
-        });
 
-        waitsFor(function() {
-            return imagery.state === ImageryState.RECEIVED;
-        }, 'image to load');
-
-        runs(function() {
-            expect(imagery.image).toBeInstanceOf(Image);
-            expect(tries).toEqual(2);
-            imagery.releaseReference();
+            return pollToPromise(function() {
+                return imagery.state === ImageryState.RECEIVED;
+            }).then(function() {
+                expect(imagery.image).toBeInstanceOf(Image);
+                expect(tries).toEqual(2);
+                imagery.releaseReference();
+            });
         });
     });
 });

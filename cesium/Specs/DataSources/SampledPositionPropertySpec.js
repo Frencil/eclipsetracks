@@ -17,8 +17,7 @@ defineSuite([
         LinearApproximation,
         ReferenceFrame,
         PositionProperty) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     it('constructor sets expected defaults', function() {
         var property = new SampledPositionProperty();
@@ -347,19 +346,19 @@ defineSuite([
 
         property.forwardExtrapolationType = ExtrapolationType.EXTRAPOLATE;
         expect(listener).toHaveBeenCalledWith(property);
-        listener.reset();
+        listener.calls.reset();
 
         property.forwardExtrapolationDuration = 1.0;
         expect(listener).toHaveBeenCalledWith(property);
-        listener.reset();
+        listener.calls.reset();
 
         property.backwardExtrapolationType = ExtrapolationType.HOLD;
         expect(listener).toHaveBeenCalledWith(property);
-        listener.reset();
+        listener.calls.reset();
 
         property.backwardExtrapolationDuration = 1.0;
         expect(listener).toHaveBeenCalledWith(property);
-        listener.reset();
+        listener.calls.reset();
 
         //No events when reassigning to the same value.
         property.forwardExtrapolationType = ExtrapolationType.EXTRAPOLATE;

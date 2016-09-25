@@ -8,12 +8,14 @@ defineSuite([
         'Core/Matrix4',
         'Core/Ray',
         'Core/Rectangle',
+        'Core/WebMercatorProjection',
+        'Core/WebMercatorTilingScheme',
         'Scene/Globe',
         'Scene/ImageryLayer',
         'Scene/ImageryLayerFeatureInfo',
         'Scene/ImageryProvider',
         'Specs/createScene',
-        'Specs/waitsForPromise',
+        'Specs/pollToPromise',
         'ThirdParty/when'
     ], function(
         ImageryLayerCollection,
@@ -24,15 +26,16 @@ defineSuite([
         Matrix4,
         Ray,
         Rectangle,
+        WebMercatorProjection,
+        WebMercatorTilingScheme,
         Globe,
         ImageryLayer,
         ImageryLayerFeatureInfo,
         ImageryProvider,
         createScene,
-        waitsForPromise,
+        pollToPromise,
         when) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     var fakeProvider = {
             isReady : function() { return false; }
@@ -293,17 +296,16 @@ defineSuite([
         });
 
         /**
-         * Repeatedly calls update until the load queue is empty.  You must wrap any code to follow
-         * this in a "runs" function.
+         * Repeatedly calls update until the load queue is empty.  Returns a promise that resolves
+         * once the load queue is empty.
          */
         function updateUntilDone(globe) {
             // update until the load queue is empty.
-            waitsFor(function() {
+            return pollToPromise(function() {
                 globe._surface._debug.enableDebugOutput = true;
-                var commandList = [];
-                globe.update(scene.context, scene.frameState, commandList);
+                scene.render();
                 return globe._surface.tileProvider.ready && globe._surface._tileLoadQueue.length === 0 && globe._surface._debug.tilesWaitingForChildren === 0;
-            }, 'updating to complete');
+            });
         }
 
         it('returns undefined when pick ray does not intersect surface', function() {
@@ -343,11 +345,7 @@ defineSuite([
 
             globe.imageryLayers.addImageryProvider(provider);
 
-            updateUntilDone(globe);
-
-            var features;
-
-            runs(function() {
+            return updateUntilDone(globe).then(function() {
                 var ellipsoid = Ellipsoid.WGS84;
                 camera.lookAt(new Cartesian3(ellipsoid.maximumRadius, 0.0, 0.0), new Cartesian3(0.0, 0.0, 100.0));
 
@@ -380,11 +378,7 @@ defineSuite([
 
             globe.imageryLayers.addImageryProvider(provider);
 
-            updateUntilDone(globe);
-
-            var features;
-
-            runs(function() {
+            return updateUntilDone(globe).then(function() {
                 var ellipsoid = Ellipsoid.WGS84;
                 camera.lookAt(new Cartesian3(ellipsoid.maximumRadius, 0.0, 0.0), new Cartesian3(0.0, 0.0, 100.0));
 
@@ -422,11 +416,9 @@ defineSuite([
                 }
             };
 
-            globe.imageryLayers.addImageryProvider(provider);
+            var currentLayer = globe.imageryLayers.addImageryProvider(provider);
 
-            updateUntilDone(globe);
-
-            runs(function() {
+            return updateUntilDone(globe).then(function() {
                 var ellipsoid = Ellipsoid.WGS84;
                 camera.lookAt(new Cartesian3(ellipsoid.maximumRadius, 0.0, 0.0), new Cartesian3(0.0, 0.0, 100.0));
                 camera.lookAtTransform(Matrix4.IDENTITY);
@@ -436,10 +428,11 @@ defineSuite([
 
                 expect(featuresPromise).toBeDefined();
 
-                waitsForPromise(featuresPromise, function(features) {
+                return featuresPromise.then(function(features) {
                     expect(features.length).toBe(1);
                     expect(features[0].name).toEqual('Foo');
                     expect(features[0].description).toContain('Foo!');
+                    expect(features[0].imageryLayer).toBe(currentLayer);
                 });
             });
         });
@@ -472,7 +465,7 @@ defineSuite([
                 }
             };
 
-            globe.imageryLayers.addImageryProvider(provider1);
+            var currentLayer1 = globe.imageryLayers.addImageryProvider(provider1);
 
             var provider2 = {
                 ready : true,
@@ -501,13 +494,9 @@ defineSuite([
                 }
             };
 
-            globe.imageryLayers.addImageryProvider(provider2);
+            var currentLayer2 = globe.imageryLayers.addImageryProvider(provider2);
 
-            updateUntilDone(globe);
-
-            var features;
-
-            runs(function() {
+            return updateUntilDone(globe).then(function() {
                 var ellipsoid = Ellipsoid.WGS84;
                 camera.lookAt(new Cartesian3(ellipsoid.maximumRadius, 0.0, 0.0), new Cartesian3(0.0, 0.0, 100.0));
                 camera.lookAtTransform(Matrix4.IDENTITY);
@@ -517,14 +506,66 @@ defineSuite([
 
                 expect(featuresPromise).toBeDefined();
 
-                waitsForPromise(featuresPromise, function(features) {
+                return featuresPromise.then(function(features) {
                     expect(features.length).toBe(2);
                     expect(features[0].name).toEqual('Bar');
                     expect(features[0].description).toContain('Bar!');
+                    expect(features[0].imageryLayer).toBe(currentLayer2);
                     expect(features[1].name).toEqual('Foo');
                     expect(features[1].description).toContain('Foo!');
+                    expect(features[1].imageryLayer).toBe(currentLayer1);
+                });
+            });
+        });
+
+        it('correctly picks from a terrain tile that is partially covered by correct-level imagery and partially covered by imagery from an ancestor level', function() {
+            var provider = {
+                ready : true,
+                rectangle : new Rectangle(-Math.PI, -WebMercatorProjection.MaximumLatitude, Math.PI, WebMercatorProjection.MaximumLatitude),
+                tileWidth : 256,
+                tileHeight : 256,
+                maximumLevel : 1,
+                minimumLevel : 1,
+                tilingScheme : new WebMercatorTilingScheme(),
+                errorEvent : new Event(),
+                hasAlphaChannel : true,
+
+                pickFeatures : function(x, y, level, longitude, latitude) {
+                    var deferred = when.defer();
+                    setTimeout(function() {
+                        var featureInfo = new ImageryLayerFeatureInfo();
+                        featureInfo.name = 'L' + level + 'X' + x + 'Y' + y;
+                        deferred.resolve([featureInfo]);
+                    }, 1);
+                    return deferred.promise;
+                },
+
+                requestImage : function(x, y, level) {
+                    // At level 1, only the northwest quadrant has a valid tile.
+                    if (level !== 1 || (x === 0 && y === 0)) {
+                        return ImageryProvider.loadImage(this, 'Data/Images/Blue.png');
+                    } else {
+                        return when.reject();
+                    }
+                }
+            };
+
+            globe.imageryLayers.addImageryProvider(provider);
+
+            camera.setView({ destination : Rectangle.fromDegrees(-180.0, 0, 0, 90) });
+
+            return updateUntilDone(globe).then(function() {
+                var ray = new Ray(camera.position, camera.direction);
+                var featuresPromise = scene.imageryLayers.pickImageryLayerFeatures(ray, scene);
+
+                expect(featuresPromise).toBeDefined();
+
+                return featuresPromise.then(function(features) {
+                    // Verify that we don't end up picking from imagery level 0.
+                    expect(features.length).toBe(1);
+                    expect(features[0].name).toEqual('L1X0Y0');
                 });
             });
         });
     });
-});
+}, 'WebGL');

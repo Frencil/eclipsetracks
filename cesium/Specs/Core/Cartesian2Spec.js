@@ -2,13 +2,14 @@
 defineSuite([
         'Core/Cartesian2',
         'Core/Math',
+        'Specs/createPackableArraySpecs',
         'Specs/createPackableSpecs'
     ], function(
         Cartesian2,
         CesiumMath,
+        createPackableArraySpecs,
         createPackableSpecs) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     it('construct with default values', function() {
         var cartesian = new Cartesian2();
@@ -50,7 +51,7 @@ defineSuite([
         var cartesian = new Cartesian2(1.0, 2.0);
         var result = new Cartesian2();
         var returnedResult = Cartesian2.clone(cartesian, result);
-        expect(cartesian).toNotBe(result);
+        expect(cartesian).not.toBe(result);
         expect(result).toBe(returnedResult);
         expect(cartesian).toEqual(result);
     });
@@ -803,4 +804,5 @@ defineSuite([
     });
 
     createPackableSpecs(Cartesian2, new Cartesian2(1, 2), [1, 2]);
+    createPackableArraySpecs(Cartesian2, [new Cartesian2(1, 2), new Cartesian2(3, 4)], [1, 2, 3, 4]);
 });

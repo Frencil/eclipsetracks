@@ -8,6 +8,7 @@ defineSuite([
         'Core/ShowGeometryInstanceAttribute',
         'Core/TimeInterval',
         'Core/TimeIntervalCollection',
+        'DataSources/CheckerboardMaterialProperty',
         'DataSources/ColorMaterialProperty',
         'DataSources/ConstantPositionProperty',
         'DataSources/ConstantProperty',
@@ -17,7 +18,9 @@ defineSuite([
         'DataSources/SampledPositionProperty',
         'DataSources/SampledProperty',
         'DataSources/TimeIntervalCollectionProperty',
+        'Scene/GroundPrimitive',
         'Scene/PrimitiveCollection',
+        'Scene/ShadowMode',
         'Specs/createDynamicGeometryBoundingSphereSpecs',
         'Specs/createDynamicProperty',
         'Specs/createScene'
@@ -30,6 +33,7 @@ defineSuite([
         ShowGeometryInstanceAttribute,
         TimeInterval,
         TimeIntervalCollection,
+        CheckerboardMaterialProperty,
         ColorMaterialProperty,
         ConstantPositionProperty,
         ConstantProperty,
@@ -39,19 +43,22 @@ defineSuite([
         SampledPositionProperty,
         SampledProperty,
         TimeIntervalCollectionProperty,
+        GroundPrimitive,
         PrimitiveCollection,
+        ShadowMode,
         createDynamicGeometryBoundingSphereSpecs,
         createDynamicProperty,
         createScene) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     var scene;
     var time;
+    var groundPrimitiveSupported;
 
     beforeAll(function() {
         scene = createScene();
         time = JulianDate.now();
+        groundPrimitiveSupported = GroundPrimitive.isSupported(scene);
     });
 
     afterAll(function() {
@@ -62,12 +69,25 @@ defineSuite([
         var ellipse = new EllipseGraphics();
         ellipse.semiMajorAxis = new ConstantProperty(2);
         ellipse.semiMinorAxis = new ConstantProperty(1);
+        ellipse.height = new ConstantProperty(0);
 
         var entity = new Entity();
         entity.position = new ConstantPositionProperty(Cartesian3.fromDegrees(0, 0, 0));
         entity.ellipse = ellipse;
         return entity;
     }
+
+    function createBasicEllipseWithoutHeight() {
+        var ellipse = new EllipseGraphics();
+        ellipse.semiMajorAxis = new ConstantProperty(2);
+        ellipse.semiMinorAxis = new ConstantProperty(1);
+
+        var entity = new Entity();
+        entity.position = new ConstantPositionProperty(Cartesian3.fromDegrees(0, 0, 0));
+        entity.ellipse = ellipse;
+        return entity;
+    }
+
 
     it('Constructor sets expected defaults', function() {
         var entity = new Entity();
@@ -86,6 +106,7 @@ defineSuite([
         expect(updater.isDynamic).toBe(false);
         expect(updater.isOutlineVisible(time)).toBe(false);
         expect(updater.isFilled(time)).toBe(false);
+        expect(updater.shadowsProperty).toBe(undefined);
         updater.destroy();
         expect(updater.isDestroyed()).toBe(true);
     });
@@ -144,6 +165,7 @@ defineSuite([
         expect(updater.outlineColorProperty).toBe(undefined);
         expect(updater.outlineWidth).toBe(1.0);
         expect(updater.isDynamic).toBe(false);
+        expect(updater.shadowsProperty).toEqual(new ConstantProperty(ShadowMode.DISABLED));
     });
 
     it('Ellipse material is correctly exposed.', function() {
@@ -411,7 +433,135 @@ defineSuite([
         expect(attributes.show.value).toEqual(ShowGeometryInstanceAttribute.toValue(outline.getValue(time2)));
     });
 
+    it('Checks that an entity without height and extrudedHeight and with a color material is on terrain', function() {
+        var entity = createBasicEllipse();
+        entity.ellipse.height = undefined;
+        entity.ellipse.outline = new ConstantProperty(true);
+
+        var updater = new EllipseGeometryUpdater(entity, scene);
+
+        if (groundPrimitiveSupported) {
+            expect(updater.onTerrain).toBe(true);
+            expect(updater.outlineEnabled).toBe(false);
+        } else {
+            expect(updater.onTerrain).toBe(false);
+            expect(updater.outlineEnabled).toBe(true);
+        }
+    });
+
+    it('Checks that an entity with height isn\'t on terrain', function() {
+        var entity = createBasicEllipse();
+        entity.ellipse.height = new ConstantProperty(1);
+
+        var updater = new EllipseGeometryUpdater(entity, scene);
+
+        expect(updater.onTerrain).toBe(false);
+    });
+
+    it('Checks that an entity with extrudedHeight isn\'t on terrain', function() {
+        var entity = createBasicEllipse();
+        entity.ellipse.height = undefined;
+        entity.ellipse.extrudedHeight = new ConstantProperty(1);
+
+        var updater = new EllipseGeometryUpdater(entity, scene);
+
+        expect(updater.onTerrain).toBe(false);
+    });
+
+    it('Checks that an entity with a non-color material isn\'t on terrain', function() {
+        var entity = createBasicEllipse();
+        entity.ellipse.height = undefined;
+        entity.ellipse.material = new GridMaterialProperty(Color.BLUE);
+
+        var updater = new EllipseGeometryUpdater(entity, scene);
+
+        expect(updater.onTerrain).toBe(false);
+    });
+
+    it('createFillGeometryInstance obeys Entity.show is false.', function() {
+        var entity = createBasicEllipse();
+        entity.show = false;
+        entity.ellipse.fill = true;
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        var instance = updater.createFillGeometryInstance(new JulianDate());
+        var attributes = instance.attributes;
+        expect(attributes.show.value).toEqual(ShowGeometryInstanceAttribute.toValue(false));
+    });
+
+    it('createOutlineGeometryInstance obeys Entity.show is false.', function() {
+        var entity = createBasicEllipse();
+        entity.show = false;
+        entity.ellipse.outline = true;
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        var instance = updater.createFillGeometryInstance(new JulianDate());
+        var attributes = instance.attributes;
+        expect(attributes.show.value).toEqual(ShowGeometryInstanceAttribute.toValue(false));
+    });
+
     it('dynamic updater sets properties', function() {
+        var ellipse = new EllipseGraphics();
+        ellipse.show = createDynamicProperty(true);
+        ellipse.semiMajorAxis = createDynamicProperty(2);
+        ellipse.semiMinorAxis = createDynamicProperty(1);
+        ellipse.outline = createDynamicProperty(true);
+        ellipse.fill = createDynamicProperty(true);
+        ellipse.height = createDynamicProperty(1);
+
+        var entity = new Entity();
+        entity.position = createDynamicProperty(Cartesian3.UNIT_Z);
+        entity.ellipse = ellipse;
+
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        var primitives = new PrimitiveCollection();
+        var groundPrimitives = new PrimitiveCollection();
+        var dynamicUpdater = updater.createDynamicUpdater(primitives, groundPrimitives);
+        expect(primitives.length).toBe(0);
+        expect(groundPrimitives.length).toBe(0);
+
+        dynamicUpdater.update(JulianDate.now());
+        expect(primitives.length).toBe(2);
+        expect(groundPrimitives.length).toBe(0);
+        expect(dynamicUpdater.isDestroyed()).toBe(false);
+
+        expect(dynamicUpdater._options.id).toBe(entity);
+        expect(dynamicUpdater._options.semiMajorAxis).toEqual(ellipse.semiMajorAxis.getValue());
+        expect(dynamicUpdater._options.semiMinorAxis).toEqual(ellipse.semiMinorAxis.getValue());
+
+        entity.show = false;
+        dynamicUpdater.update(JulianDate.now());
+        expect(primitives.length).toBe(0);
+        expect(groundPrimitives.length).toBe(0);
+        entity.show = true;
+
+        ellipse.show.setValue(false);
+        dynamicUpdater.update(JulianDate.now());
+        expect(primitives.length).toBe(0);
+        expect(groundPrimitives.length).toBe(0);
+
+        ellipse.show.setValue(true);
+        ellipse.fill.setValue(false);
+        dynamicUpdater.update(JulianDate.now());
+        expect(primitives.length).toBe(1);
+        expect(groundPrimitives.length).toBe(0);
+
+        ellipse.fill.setValue(true);
+        ellipse.outline.setValue(false);
+        dynamicUpdater.update(JulianDate.now());
+        expect(primitives.length).toBe(1);
+        expect(groundPrimitives.length).toBe(0);
+
+        ellipse.semiMajorAxis.setValue(undefined);
+        dynamicUpdater.update(JulianDate.now());
+        expect(primitives.length).toBe(0);
+        expect(groundPrimitives.length).toBe(0);
+
+        dynamicUpdater.destroy();
+        expect(primitives.length).toBe(0);
+        expect(groundPrimitives.length).toBe(0);
+        updater.destroy();
+    });
+
+    it('dynamic updater on terrain', function() {
         var ellipse = new EllipseGraphics();
         ellipse.show = createDynamicProperty(true);
         ellipse.semiMajorAxis = createDynamicProperty(2);
@@ -425,37 +575,23 @@ defineSuite([
 
         var updater = new EllipseGeometryUpdater(entity, scene);
         var primitives = new PrimitiveCollection();
-        var dynamicUpdater = updater.createDynamicUpdater(primitives);
-        expect(primitives.length).toBe(0);
-
-        dynamicUpdater.update(JulianDate.now());
-        expect(primitives.length).toBe(2);
+        var groundPrimitives = new PrimitiveCollection();
+        var dynamicUpdater = updater.createDynamicUpdater(primitives, groundPrimitives);
         expect(dynamicUpdater.isDestroyed()).toBe(false);
-
-        expect(dynamicUpdater._options.id).toBe(entity);
-        expect(dynamicUpdater._options.semiMajorAxis).toEqual(ellipse.semiMajorAxis.getValue());
-        expect(dynamicUpdater._options.semiMinorAxis).toEqual(ellipse.semiMinorAxis.getValue());
-
-        ellipse.show.setValue(false);
-        dynamicUpdater.update(JulianDate.now());
         expect(primitives.length).toBe(0);
+        expect(groundPrimitives.length).toBe(0);
 
-        ellipse.show.setValue(true);
-        ellipse.fill.setValue(false);
-        dynamicUpdater.update(JulianDate.now());
-        expect(primitives.length).toBe(1);
+        dynamicUpdater.update(time);
 
-        ellipse.fill.setValue(true);
-        ellipse.outline.setValue(false);
-        dynamicUpdater.update(JulianDate.now());
-        expect(primitives.length).toBe(1);
-
-        ellipse.semiMajorAxis.setValue(undefined);
-        dynamicUpdater.update(JulianDate.now());
-        expect(primitives.length).toBe(0);
+        if (groundPrimitiveSupported) {
+            expect(primitives.length).toBe(0);
+            expect(groundPrimitives.length).toBe(1);
+        } else {
+            expect(primitives.length).toBe(2);
+            expect(groundPrimitives.length).toBe(0);
+        }
 
         dynamicUpdater.destroy();
-        expect(primitives.length).toBe(0);
         updater.destroy();
     });
 
@@ -466,27 +602,27 @@ defineSuite([
         updater.geometryChanged.addEventListener(listener);
 
         entity.position = new ConstantPositionProperty(Cartesian3.UNIT_Z);
-        expect(listener.callCount).toEqual(1);
+        expect(listener.calls.count()).toEqual(1);
 
         entity.ellipse.semiMajorAxis = new ConstantProperty(82);
-        expect(listener.callCount).toEqual(2);
+        expect(listener.calls.count()).toEqual(2);
 
         entity.availability = new TimeIntervalCollection();
-        expect(listener.callCount).toEqual(3);
+        expect(listener.calls.count()).toEqual(3);
 
         entity.ellipse.semiMajorAxis = undefined;
-        expect(listener.callCount).toEqual(4);
+        expect(listener.calls.count()).toEqual(4);
 
         //Since there's no valid geometry, changing another property should not raise the event.
         entity.ellipse.semiMinorAxis = undefined;
 
         //Modifying an unrelated property should not have any effect.
         entity.viewFrom = new ConstantProperty(Cartesian3.UNIT_X);
-        expect(listener.callCount).toEqual(4);
+        expect(listener.calls.count()).toEqual(4);
 
         entity.ellipse.semiMajorAxis = new SampledProperty(Number);
         entity.ellipse.semiMinorAxis = new SampledProperty(Number);
-        expect(listener.callCount).toEqual(5);
+        expect(listener.calls.count()).toEqual(5);
     });
 
     it('createFillGeometryInstance throws if object is not filled', function() {
@@ -563,9 +699,63 @@ defineSuite([
         }).toThrowDeveloperError();
     });
 
+    it('fill is true sets onTerrain to true', function() {
+        var entity = createBasicEllipseWithoutHeight();
+        entity.ellipse.fill = true;
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        if (groundPrimitiveSupported) {
+            expect(updater.onTerrain).toBe(true);
+        } else {
+            expect(updater.onTerrain).toBe(false);
+        }
+    });
+
+    it('fill is false sets onTerrain to false', function() {
+        var entity = createBasicEllipseWithoutHeight();
+        entity.ellipse.fill = false;
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        expect(updater.onTerrain).toBe(false);
+    });
+
+    it('a defined height sets onTerrain to false', function() {
+        var entity = createBasicEllipseWithoutHeight();
+        entity.ellipse.fill = true;
+        entity.ellipse.height = 0;
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        expect(updater.onTerrain).toBe(false);
+    });
+
+    it('a defined extrudedHeight sets onTerrain to false', function() {
+        var entity = createBasicEllipseWithoutHeight();
+        entity.ellipse.fill = true;
+        entity.ellipse.extrudedHeight = 12;
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        expect(updater.onTerrain).toBe(false);
+    });
+
+    it('color material sets onTerrain to true', function() {
+        var entity = createBasicEllipseWithoutHeight();
+        entity.ellipse.fill = true;
+        entity.ellipse.material = new ColorMaterialProperty(Color.WHITE);
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        if (groundPrimitiveSupported) {
+            expect(updater.onTerrain).toBe(true);
+        } else {
+            expect(updater.onTerrain).toBe(false);
+        }
+    });
+
+    it('non-color material sets onTerrain to false', function() {
+        var entity = createBasicEllipseWithoutHeight();
+        entity.ellipse.fill = true;
+        entity.ellipse.material = new CheckerboardMaterialProperty();
+        var updater = new EllipseGeometryUpdater(entity, scene);
+        expect(updater.onTerrain).toBe(false);
+    });
+
     var entity = createBasicEllipse();
     entity.ellipse.semiMajorAxis = createDynamicProperty(4);
     createDynamicGeometryBoundingSphereSpecs(EllipseGeometryUpdater, entity, entity.ellipse, function() {
         return scene;
     });
-});
+}, 'WebGL');

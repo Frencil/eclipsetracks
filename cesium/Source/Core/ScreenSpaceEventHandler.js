@@ -6,6 +6,8 @@ define([
         './defined',
         './destroyObject',
         './DeveloperError',
+        './FeatureDetection',
+        './getTimestamp',
         './KeyboardEventModifier',
         './ScreenSpaceEventType'
     ], function(
@@ -15,9 +17,11 @@ define([
         defined,
         destroyObject,
         DeveloperError,
+        FeatureDetection,
+        getTimestamp,
         KeyboardEventModifier,
         ScreenSpaceEventType) {
-    "use strict";
+    'use strict';
 
     function getPosition(screenSpaceEventHandler, event, result) {
         var element = screenSpaceEventHandler._element;
@@ -60,10 +64,9 @@ define([
     };
 
     function registerListener(screenSpaceEventHandler, domType, element, callback) {
-        var listener = function(e) {
+        function listener(e) {
             callback(screenSpaceEventHandler, e);
-        };
-
+        }
         element.addEventListener(domType, listener, false);
 
         screenSpaceEventHandler._removalFunctions.push(function() {
@@ -79,7 +82,7 @@ define([
         // this is affected by the existence of an undocumented disableRootEvents property on element.
         var alternateElement = !defined(element.disableRootEvents) ? document : element;
 
-        if (defined(window.PointerEvent)) {
+        if (FeatureDetection.supportsPointerEvents()) {
             registerListener(screenSpaceEventHandler, 'pointerdown', element, handlePointerDown);
             registerListener(screenSpaceEventHandler, 'pointerup', element, handlePointerUp);
             registerListener(screenSpaceEventHandler, 'pointermove', element, handlePointerMove);
@@ -99,7 +102,7 @@ define([
         if ('onwheel' in element) {
             // spec event type
             wheelEvent = 'wheel';
-        } else if (defined(document.onmousewheel)) {
+        } else if (document.onmousewheel !== undefined) {
             // legacy event type
             wheelEvent = 'mousewheel';
         } else {
@@ -121,8 +124,16 @@ define([
         position : new Cartesian2()
     };
 
+    function gotTouchEvent(screenSpaceEventHandler) {
+        screenSpaceEventHandler._lastSeenTouchEvent = getTimestamp();
+    }
+
+    function canProcessMouseEvent(screenSpaceEventHandler) {
+        return (getTimestamp() - screenSpaceEventHandler._lastSeenTouchEvent) > ScreenSpaceEventHandler.mouseEmulationIgnoreMilliseconds;
+    }
+
     function handleMouseDown(screenSpaceEventHandler, event) {
-        if (screenSpaceEventHandler._seenAnyTouchEvents) {
+        if (!canProcessMouseEvent(screenSpaceEventHandler)) {
             return;
         }
 
@@ -165,7 +176,7 @@ define([
     };
 
     function handleMouseUp(screenSpaceEventHandler, event) {
-        if (screenSpaceEventHandler._seenAnyTouchEvents) {
+        if (!canProcessMouseEvent(screenSpaceEventHandler)) {
             return;
         }
 
@@ -222,7 +233,7 @@ define([
     };
 
     function handleMouseMove(screenSpaceEventHandler, event) {
-        if (screenSpaceEventHandler._seenAnyTouchEvents) {
+        if (!canProcessMouseEvent(screenSpaceEventHandler)) {
             return;
         }
 
@@ -317,7 +328,7 @@ define([
     }
 
     function handleTouchStart(screenSpaceEventHandler, event) {
-        screenSpaceEventHandler._seenAnyTouchEvents = true;
+        gotTouchEvent(screenSpaceEventHandler);
 
         var changedTouches = event.changedTouches;
 
@@ -345,7 +356,7 @@ define([
     }
 
     function handleTouchEnd(screenSpaceEventHandler, event) {
-        screenSpaceEventHandler._seenAnyTouchEvents = true;
+        gotTouchEvent(screenSpaceEventHandler);
 
         var changedTouches = event.changedTouches;
 
@@ -474,7 +485,7 @@ define([
     }
 
     function handleTouchMove(screenSpaceEventHandler, event) {
-        screenSpaceEventHandler._seenAnyTouchEvents = true;
+        gotTouchEvent(screenSpaceEventHandler);
 
         var changedTouches = event.changedTouches;
 
@@ -618,8 +629,12 @@ define([
             var positions = screenSpaceEventHandler._positions;
 
             var identifier = event.pointerId;
-            getPosition(screenSpaceEventHandler, event, positions.get(identifier));
+            var position = positions.get(identifier);
+            if(!defined(position)){
+                return;
+            }
 
+            getPosition(screenSpaceEventHandler, event, position);
             fireTouchMoveEvents(screenSpaceEventHandler, event);
 
             var previousPositions = screenSpaceEventHandler._previousPositions;
@@ -639,11 +654,11 @@ define([
      *
      * @constructor
      */
-    var ScreenSpaceEventHandler = function(element) {
+    function ScreenSpaceEventHandler(element) {
         this._inputEvents = {};
         this._buttonDown = undefined;
         this._isPinching = false;
-        this._seenAnyTouchEvents = false;
+        this._lastSeenTouchEvent = -ScreenSpaceEventHandler.mouseEmulationIgnoreMilliseconds;
 
         this._primaryStartPosition = new Cartesian2();
         this._primaryPosition = new Cartesian2();
@@ -661,7 +676,7 @@ define([
         this._element = defaultValue(element, document);
 
         registerListeners(this);
-    };
+    }
 
     /**
      * Set a function to be executed on an input event.
@@ -755,16 +770,24 @@ define([
      *
      * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
      *
-     * @see ScreenSpaceEventHandler#isDestroyed
      *
      * @example
      * handler = handler && handler.destroy();
+     *
+     * @see ScreenSpaceEventHandler#isDestroyed
      */
     ScreenSpaceEventHandler.prototype.destroy = function() {
         unregisterListeners(this);
 
         return destroyObject(this);
     };
+
+    /**
+     * The amount of time, in milliseconds, that mouse events will be disabled after
+     * receiving any touch events, such that any emulated mouse events will be ignored.
+     * @default 800
+     */
+    ScreenSpaceEventHandler.mouseEmulationIgnoreMilliseconds = 800;
 
     return ScreenSpaceEventHandler;
 });

@@ -1,10 +1,18 @@
 /*global defineSuite*/
 defineSuite([
-        'Core/Cartographic'
+        'Core/Cartographic',
+        'Core/Cartesian3',
+        'Core/Ellipsoid',
+        'Core/Math'
     ], function(
-        Cartographic) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+        Cartographic,
+        Cartesian3,
+        Ellipsoid,
+        CesiumMath) {
+    'use strict';
+
+    var surfaceCartesian = new Cartesian3(4094327.7921465295, 1909216.4044747739, 4487348.4088659193);
+    var surfaceCartographic = new Cartographic(CesiumMath.toRadians(25.0), CesiumMath.toRadians(45.0), 0.0);
 
     it('default constructor sets expected properties', function() {
         var c = new Cartographic();
@@ -78,10 +86,35 @@ defineSuite([
         expect(c.height).toEqual(0.0);
     });
 
+    it('fromCartesian works without a result parameter', function() {
+        var ellipsoid = Ellipsoid.WGS84;
+        var c = Cartographic.fromCartesian(surfaceCartesian, ellipsoid);
+        expect(c).toEqualEpsilon(surfaceCartographic, CesiumMath.EPSILON8);
+    });
+
+    it('fromCartesian works with a result parameter', function() {
+        var ellipsoid = Ellipsoid.WGS84;
+        var result = new Cartographic();
+        var c = Cartographic.fromCartesian(surfaceCartesian, ellipsoid, result);
+        expect(c).toEqualEpsilon(surfaceCartographic, CesiumMath.EPSILON8);
+        expect(result).toBe(c);
+    });
+
+    it('fromCartesian works without an ellipsoid', function() {
+        var c = Cartographic.fromCartesian(surfaceCartesian);
+        expect(c).toEqualEpsilon(surfaceCartographic, CesiumMath.EPSILON8);
+    });
+
+    it('fromCartesian throws when there is no cartesian', function() {
+        expect(function() {
+            Cartographic.fromCartesian();
+        }).toThrowDeveloperError();
+    });
+
     it('clone without a result parameter', function() {
         var cartographic = new Cartographic(1.0, 2.0, 3.0);
         var result = cartographic.clone();
-        expect(cartographic).toNotBe(result);
+        expect(cartographic).not.toBe(result);
         expect(cartographic).toEqual(result);
     });
 
@@ -89,7 +122,7 @@ defineSuite([
         var cartographic = new Cartographic(1.0, 2.0, 3.0);
         var result = new Cartographic();
         var returnedResult = cartographic.clone(result);
-        expect(cartographic).toNotBe(result);
+        expect(cartographic).not.toBe(result);
         expect(result).toBe(returnedResult);
         expect(cartographic).toEqual(result);
     });

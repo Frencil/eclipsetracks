@@ -6,7 +6,6 @@ define([
         '../Core/defaultValue',
         '../Core/defined',
         '../Core/defineProperties',
-        '../Core/deprecationWarning',
         '../Core/DeveloperError',
         '../Core/Event',
         '../Core/getFilenameFromUri',
@@ -14,6 +13,7 @@ define([
         '../Core/PinBuilder',
         '../Core/PolygonHierarchy',
         '../Core/RuntimeError',
+        '../Scene/HeightReference',
         '../Scene/VerticalOrigin',
         '../ThirdParty/topojson',
         '../ThirdParty/when',
@@ -22,6 +22,7 @@ define([
         './ColorMaterialProperty',
         './ConstantPositionProperty',
         './ConstantProperty',
+        './CorridorGraphics',
         './DataSource',
         './EntityCollection',
         './PolygonGraphics',
@@ -33,7 +34,6 @@ define([
         defaultValue,
         defined,
         defineProperties,
-        deprecationWarning,
         DeveloperError,
         Event,
         getFilenameFromUri,
@@ -41,6 +41,7 @@ define([
         PinBuilder,
         PolygonHierarchy,
         RuntimeError,
+        HeightReference,
         VerticalOrigin,
         topojson,
         when,
@@ -49,11 +50,12 @@ define([
         ColorMaterialProperty,
         ConstantPositionProperty,
         ConstantProperty,
+        CorridorGraphics,
         DataSource,
         EntityCollection,
         PolygonGraphics,
         PolylineGraphics) {
-    "use strict";
+    'use strict';
 
     function defaultCrsFunction(coordinates) {
         return Cartesian3.fromDegrees(coordinates[0], coordinates[1], coordinates[2]);
@@ -61,7 +63,8 @@ define([
 
     var crsNames = {
         'urn:ogc:def:crs:OGC:1.3:CRS84' : defaultCrsFunction,
-        'EPSG:4326' : defaultCrsFunction
+        'EPSG:4326' : defaultCrsFunction,
+        'urn:ogc:def:crs:EPSG::4326' : defaultCrsFunction
     };
 
     var crsLinkHrefs = {};
@@ -72,6 +75,7 @@ define([
     var defaultStroke = Color.YELLOW;
     var defaultStrokeWidth = 2;
     var defaultFill = Color.fromBytes(255, 255, 0, 100);
+    var defaultClampToGround = false;
 
     var defaultStrokeWidthProperty = new ConstantProperty(defaultStrokeWidth);
     var defaultStrokeMaterialProperty = new ColorMaterialProperty(defaultStroke);
@@ -87,9 +91,7 @@ define([
     'marker-size', 'marker-symbol', 'marker-color', 'stroke', //
     'stroke-opacity', 'stroke-width', 'fill', 'fill-opacity'];
 
-    var stringifyScratch = new Array(4);
-
-    function describe(properties, nameProperty) {
+    function defaultDescribe(properties, nameProperty) {
         var html = '';
         for ( var key in properties) {
             if (properties.hasOwnProperty(key)) {
@@ -99,7 +101,7 @@ define([
                 var value = properties[key];
                 if (defined(value)) {
                     if (typeof value === 'object') {
-                        html += '<tr><th>' + key + '</th><td>' + describe(value) + '</td></tr>';
+                        html += '<tr><th>' + key + '</th><td>' + defaultDescribe(value) + '</td></tr>';
                     } else {
                         html += '<tr><th>' + key + '</th><td>' + value + '</td></tr>';
                     }
@@ -114,7 +116,7 @@ define([
         return html;
     }
 
-    function createDescriptionCallback(properties, nameProperty) {
+    function createDescriptionCallback(describe, properties, nameProperty) {
         var description;
         return function(time, result) {
             if (!defined(description)) {
@@ -124,10 +126,14 @@ define([
         };
     }
 
+    function defaultDescribeProperty(properties, nameProperty) {
+        return new CallbackProperty(createDescriptionCallback(defaultDescribe, properties, nameProperty), true);
+    }
+
     //GeoJSON specifies only the Feature object has a usable id property
     //But since "multi" geometries create multiple entity,
     //we can't use it for them either.
-    function createObject(geoJson, entityCollection) {
+    function createObject(geoJson, entityCollection, describe) {
         var id = geoJson.id;
         if (!defined(id) || geoJson.type !== 'Feature') {
             id = createGuid();
@@ -188,10 +194,8 @@ define([
             }
 
             var description = properties.description;
-            if (!defined(description)) {
-                entity.description = new CallbackProperty(createDescriptionCallback(properties, nameProperty), true);
-            } else {
-                entity.description = new ConstantProperty(description);
+            if (description !== null) {
+                entity.description = !defined(description) ? describe(properties, nameProperty) : new ConstantProperty(description);
             }
         }
         return entity;
@@ -207,21 +211,22 @@ define([
 
     // GeoJSON processing functions
     function processFeature(dataSource, feature, notUsed, crsFunction, options) {
+        if (feature.geometry === null) {
+            //Null geometry is allowed, so just create an empty entity instance for it.
+            createObject(feature, dataSource._entityCollection, options.describe);
+            return;
+        }
+
         if (!defined(feature.geometry)) {
             throw new RuntimeError('feature.geometry is required.');
         }
 
-        if (feature.geometry === null) {
-            //Null geometry is allowed, so just create an empty entity instance for it.
-            createObject(feature, dataSource._entityCollection);
-        } else {
-            var geometryType = feature.geometry.type;
-            var geometryHandler = geometryTypes[geometryType];
-            if (!defined(geometryHandler)) {
-                throw new RuntimeError('Unknown geometry type: ' + geometryType);
-            }
-            geometryHandler(dataSource, feature, feature.geometry, crsFunction, options);
+        var geometryType = feature.geometry.type;
+        var geometryHandler = geometryTypes[geometryType];
+        if (!defined(geometryHandler)) {
+            throw new RuntimeError('Unknown geometry type: ' + geometryType);
         }
+        geometryHandler(dataSource, feature, feature.geometry, crsFunction, options);
     }
 
     function processFeatureCollection(dataSource, featureCollection, notUsed, crsFunction, options) {
@@ -257,13 +262,11 @@ define([
             }
 
             size = defaultValue(sizes[properties['marker-size']], size);
-            symbol = defaultValue(properties['marker-symbol'], symbol);
+            var markerSymbol = properties['marker-symbol'];
+            if (defined(markerSymbol)) {
+                symbol = markerSymbol;
+            }
         }
-
-        stringifyScratch[0] = symbol;
-        stringifyScratch[1] = color;
-        stringifyScratch[2] = size;
-        var id = JSON.stringify(stringifyScratch);
 
         var canvasOrPromise;
         if (defined(symbol)) {
@@ -281,7 +284,12 @@ define([
             billboard.verticalOrigin = new ConstantProperty(VerticalOrigin.BOTTOM);
             billboard.image = new ConstantProperty(dataUrl);
 
-            var entity = createObject(geoJson, dataSource._entityCollection);
+            // Clamp to ground if there isn't a height specified
+            if (coordinates.length === 2) {
+                billboard.heightReference = HeightReference.CLAMP_TO_GROUND;
+            }
+
+            var entity = createObject(geoJson, dataSource._entityCollection, options.describe);
             entity.billboard = billboard;
             entity.position = new ConstantPositionProperty(crsFunction(coordinates));
         }));
@@ -326,13 +334,19 @@ define([
             }
         }
 
-        var polyline = new PolylineGraphics();
-        polyline.material = material;
-        polyline.width = widthProperty;
-        polyline.positions = new ConstantProperty(coordinatesArrayToCartesianArray(coordinates, crsFunction));
+        var entity = createObject(geoJson, dataSource._entityCollection, options.describe);
+        var graphics;
+        if (options.clampToGround) {
+            graphics = new CorridorGraphics();
+            entity.corridor = graphics;
+        } else {
+            graphics = new PolylineGraphics();
+            entity.polyline = graphics;
+        }
 
-        var entity = createObject(geoJson, dataSource._entityCollection);
-        entity.polyline = polyline;
+        graphics.material = material;
+        graphics.width = widthProperty;
+        graphics.positions = new ConstantProperty(coordinatesArrayToCartesianArray(coordinates, crsFunction));
     }
 
     function processLineString(dataSource, geoJson, geometry, crsFunction, options) {
@@ -412,9 +426,11 @@ define([
         polygon.hierarchy = new ConstantProperty(new PolygonHierarchy(coordinatesArrayToCartesianArray(positions, crsFunction), holes));
         if (positions[0].length > 2) {
             polygon.perPositionHeight = new ConstantProperty(true);
+        } else if (!options.clampToGround) {
+            polygon.height = 0;
         }
 
-        var entity = createObject(geoJson, dataSource._entityCollection);
+        var entity = createObject(geoJson, dataSource._entityCollection, options.describe);
         entity.polygon = polygon;
     }
 
@@ -487,23 +503,16 @@ define([
      *   markerSymbol: '?'
      * }));
      */
-    var GeoJsonDataSource = function(name) {
+    function GeoJsonDataSource(name) {
         this._name = name;
         this._changed = new Event();
         this._error = new Event();
         this._isLoading = false;
         this._loading = new Event();
-        this._entityCollection = new EntityCollection();
+        this._entityCollection = new EntityCollection(this);
         this._promises = [];
         this._pinBuilder = new PinBuilder();
-    };
-
-    GeoJsonDataSource.fromUrl = function(url, options) {
-        deprecationWarning('GeoJsonDataSource.fromUrl', 'GeoJsonDataSource.fromUrl has been deprecated.  Use GeoJsonDataSource.load instead.');
-        var result = new GeoJsonDataSource();
-        result.load(url, options);
-        return result;
-    };
+    }
 
     /**
      * Creates a Promise to a new instance loaded with the provided GeoJSON or TopoJSON data.
@@ -517,8 +526,9 @@ define([
      * @param {Color} [options.stroke=GeoJsonDataSource.stroke] The default color of polylines and polygon outlines.
      * @param {Number} [options.strokeWidth=GeoJsonDataSource.strokeWidth] The default width of polylines and polygon outlines.
      * @param {Color} [options.fill=GeoJsonDataSource.fill] The default color for polygon interiors.
+     * @param {Boolean} [options.clampToGround=GeoJsonDataSource.clampToGround] true if we want the geometry features (polygons or linestrings) clamped to the ground. If true, lines will use corridors so use Entity.corridor instead of Entity.polyline.
      *
-     * @returns {Promise} A promise that will resolve when the data is loaded.
+     * @returns {Promise.<GeoJsonDataSource>} A promise that will resolve when the data is loaded.
      */
     GeoJsonDataSource.load = function(data, options) {
         return new GeoJsonDataSource().load(data, options);
@@ -611,6 +621,20 @@ define([
             set : function(value) {
                 defaultFill = value;
                 defaultFillMaterialProperty = new ColorMaterialProperty(defaultFill);
+            }
+        },
+        /**
+         * Gets or sets default of whether to clamp to the ground.
+         * @memberof GeoJsonDataSource
+         * @type {Boolean}
+         * @default false
+         */
+        clampToGround : {
+            get : function() {
+                return defaultClampToGround;
+            },
+            set : function(value) {
+                defaultClampToGround = value;
             }
         },
 
@@ -727,13 +751,21 @@ define([
             get : function() {
                 return this._loading;
             }
+        },
+        /**
+         * Gets whether or not this data source should be displayed.
+         * @memberof GeoJsonDataSource.prototype
+         * @type {Boolean}
+         */
+        show : {
+            get : function() {
+                return this._entityCollection.show;
+            },
+            set : function(value) {
+                this._entityCollection.show = value;
+            }
         }
     });
-
-    GeoJsonDataSource.prototype.loadUrl = function(url, options) {
-        deprecationWarning('GeoJsonDataSource.prototype.loadUrl', 'GeoJsonDataSource.loadUrl has been deprecated.  You can now pass a url to GeoJsonDataSource.load.');
-        return this.load(url, options);
-    };
 
     /**
      * Asynchronously loads the provided GeoJSON or TopoJSON data, replacing any existing data.
@@ -741,14 +773,17 @@ define([
      * @param {String|Object} data A url, GeoJSON object, or TopoJSON object to be loaded.
      * @param {Object} [options] An object with the following properties:
      * @param {String} [options.sourceUri] Overrides the url to use for resolving relative links.
+     * @param {GeoJsonDataSource~describe} [options.describe=GeoJsonDataSource.defaultDescribeProperty] A function which returns a Property object (or just a string),
+     *                                                                                which converts the properties into an html description.
      * @param {Number} [options.markerSize=GeoJsonDataSource.markerSize] The default size of the map pin created for each point, in pixels.
      * @param {String} [options.markerSymbol=GeoJsonDataSource.markerSymbol] The default symbol of the map pin created for each point.
      * @param {Color} [options.markerColor=GeoJsonDataSource.markerColor] The default color of the map pin created for each point.
      * @param {Color} [options.stroke=GeoJsonDataSource.stroke] The default color of polylines and polygon outlines.
      * @param {Number} [options.strokeWidth=GeoJsonDataSource.strokeWidth] The default width of polylines and polygon outlines.
      * @param {Color} [options.fill=GeoJsonDataSource.fill] The default color for polygon interiors.
+     * @param {Boolean} [options.clampToGround=GeoJsonDataSource.clampToGround] true if we want the features clamped to the ground.
      *
-     * @returns {Promise} a promise that will resolve when the GeoJSON is loaded.
+     * @returns {Promise.<GeoJsonDataSource>} a promise that will resolve when the GeoJSON is loaded.
      */
     GeoJsonDataSource.prototype.load = function(data, options) {
         //>>includeStart('debug', pragmas.debug);
@@ -770,12 +805,14 @@ define([
         }
 
         options = {
+            describe: defaultValue(options.describe, defaultDescribeProperty),
             markerSize : defaultValue(options.markerSize, defaultMarkerSize),
             markerSymbol : defaultValue(options.markerSymbol, defaultMarkerSymbol),
             markerColor : defaultValue(options.markerColor, defaultMarkerColor),
             strokeWidthProperty : new ConstantProperty(defaultValue(options.strokeWidth, defaultStrokeWidth)),
             strokeMaterialProperty : new ColorMaterialProperty(defaultValue(options.stroke, defaultStroke)),
-            fillMaterialProperty : new ColorMaterialProperty(defaultValue(options.fill, defaultFill))
+            fillMaterialProperty : new ColorMaterialProperty(defaultValue(options.fill, defaultFill)),
+            clampToGround : defaultValue(options.clampToGround, defaultClampToGround)
         };
 
         var that = this;
@@ -784,7 +821,7 @@ define([
         }).otherwise(function(error) {
             DataSource.setLoading(that, false);
             that._error.raiseEvent(that, error);
-            window.console.log(error);
+            console.log(error);
             return when.reject(error);
         });
     };
@@ -808,10 +845,12 @@ define([
         //Check for a Coordinate Reference System.
         var crsFunction = defaultCrsFunction;
         var crs = geoJson.crs;
+
+        if (crs === null) {
+            throw new RuntimeError('crs is null.');
+        }
+
         if (defined(crs)) {
-            if (crs === null) {
-                throw new RuntimeError('crs is null.');
-            }
             if (!defined(crs.properties)) {
                 throw new RuntimeError('crs.properties is undefined.');
             }
@@ -854,6 +893,13 @@ define([
             });
         });
     }
+
+    /**
+     * This callback is displayed as part of the GeoJsonDataSource class.
+     * @callback GeoJsonDataSource~describe
+     * @param {Object} properties The properties of the feature.
+     * @param {String} nameProperty The property key that Cesium estimates to have the name of the feature.
+     */
 
     return GeoJsonDataSource;
 });

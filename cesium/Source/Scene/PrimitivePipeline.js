@@ -11,6 +11,7 @@ define([
         '../Core/GeographicProjection',
         '../Core/Geometry',
         '../Core/GeometryAttribute',
+        '../Core/GeometryAttributes',
         '../Core/GeometryPipeline',
         '../Core/IndexDatatype',
         '../Core/Matrix4',
@@ -27,11 +28,12 @@ define([
         GeographicProjection,
         Geometry,
         GeometryAttribute,
+        GeometryAttributes,
         GeometryPipeline,
         IndexDatatype,
         Matrix4,
         WebMercatorProjection) {
-    "use strict";
+    'use strict';
 
     // Bail out if the browser doesn't support typed arrays, to prevent the setup function
     // from failing, since we won't be able to create a WebGL context anyway.
@@ -151,7 +153,7 @@ define([
             var attribute = instanceAttributes[name];
             var componentDatatype = attribute.componentDatatype;
             var value = attribute.value;
-            var componentsPerAttribute = value.length;
+            var componentsPerAttribute = attribute.componentsPerAttribute;
 
             var buffer = ComponentDatatype.createTypedArray(componentDatatype, numberOfVertices * componentsPerAttribute);
             for (var k = 0; k < numberOfVertices; ++k) {
@@ -450,6 +452,55 @@ define([
         return indices;
     }
 
+    function createPickOffsets(instances, geometryName, geometries, pickOffsets) {
+        var offset;
+        var indexCount;
+        var geometryIndex;
+
+        var offsetIndex = pickOffsets.length - 1;
+        if (offsetIndex >= 0) {
+            var pickOffset = pickOffsets[offsetIndex];
+            offset = pickOffset.offset + pickOffset.count;
+            geometryIndex = pickOffset.index;
+            indexCount = geometries[geometryIndex].indices.length;
+        } else {
+            offset = 0;
+            geometryIndex = 0;
+            indexCount = geometries[geometryIndex].indices.length;
+        }
+
+        var length = instances.length;
+        for (var i = 0; i < length; ++i) {
+            var instance = instances[i];
+            var geometry = instance[geometryName];
+            if (!defined(geometry)) {
+                continue;
+            }
+
+            var count = geometry.indices.length;
+
+            if (offset + count > indexCount) {
+                offset = 0;
+                indexCount = geometries[++geometryIndex].indices.length;
+            }
+
+            pickOffsets.push({
+                index : geometryIndex,
+                offset : offset,
+                count : count
+            });
+            offset += count;
+        }
+    }
+
+    function createInstancePickOffsets(instances, geometries) {
+        var pickOffsets = [];
+        createPickOffsets(instances, 'geometry', geometries, pickOffsets);
+        createPickOffsets(instances, 'westHemisphereGeometry', geometries, pickOffsets);
+        createPickOffsets(instances, 'eastHemisphereGeometry', geometries, pickOffsets);
+        return pickOffsets;
+    }
+
     /**
      * @private
      */
@@ -485,6 +536,11 @@ define([
         perInstanceAttributeNames = defined(perInstanceAttributeNames) ? perInstanceAttributeNames : getCommonPerInstanceAttributeNames(invalidInstances);
         var indices = computePerInstanceAttributeLocations(instances, invalidInstances, perInstanceAttributes, attributeLocations, perInstanceAttributeNames);
 
+        var pickOffsets;
+        if (parameters.createPickOffsets && defined(geometries)) {
+            pickOffsets = createInstancePickOffsets(instances, geometries);
+        }
+
         return {
             geometries : geometries,
             modelMatrix : parameters.modelMatrix,
@@ -492,7 +548,8 @@ define([
             vaAttributes : perInstanceAttributes,
             vaAttributeLocations : indices,
             validInstancesIndices : parameters.validInstancesIndices,
-            invalidInstancesIndices : parameters.invalidInstancesIndices
+            invalidInstancesIndices : parameters.invalidInstancesIndices,
+            pickOffsets : pickOffsets
         };
     };
 
@@ -685,7 +742,7 @@ define([
             var length;
             var values;
             var componentsPerAttribute;
-            var attributes = {};
+            var attributes = new GeometryAttributes();
             var numAttributes = packedGeometry[packedGeometryIndex++];
             for (i = 0; i < numAttributes; i++) {
                 var name = stringTable[packedGeometry[packedGeometryIndex++]];
@@ -1037,7 +1094,8 @@ define([
             allowPicking : parameters.allowPicking,
             vertexCacheOptimize : parameters.vertexCacheOptimize,
             compressVertices : parameters.compressVertices,
-            modelMatrix : parameters.modelMatrix
+            modelMatrix : parameters.modelMatrix,
+            createPickOffsets : parameters.createPickOffsets
         };
     };
 
@@ -1097,7 +1155,8 @@ define([
             allowPicking : packedParameters.allowPicking,
             vertexCacheOptimize : packedParameters.vertexCacheOptimize,
             compressVertices : packedParameters.compressVertices,
-            modelMatrix : Matrix4.clone(packedParameters.modelMatrix)
+            modelMatrix : Matrix4.clone(packedParameters.modelMatrix),
+            createPickOffsets : packedParameters.createPickOffsets
         };
     };
 
@@ -1117,7 +1176,8 @@ define([
             packedVaAttributeLocations : packAttributeLocations(results.vaAttributeLocations, transferableObjects),
             modelMatrix : results.modelMatrix,
             validInstancesIndices : results.validInstancesIndices,
-            invalidInstancesIndices : results.invalidInstancesIndices
+            invalidInstancesIndices : results.invalidInstancesIndices,
+            pickOffsets : results.pickOffsets
         };
     };
 
@@ -1130,7 +1190,8 @@ define([
             attributeLocations : packedResult.attributeLocations,
             vaAttributes : packedResult.vaAttributes,
             perInstanceAttributeLocations : unpackAttributeLocations(packedResult.packedVaAttributeLocations, packedResult.vaAttributes),
-            modelMatrix : packedResult.modelMatrix
+            modelMatrix : packedResult.modelMatrix,
+            pickOffsets : packedResult.pickOffsets
         };
     };
 
