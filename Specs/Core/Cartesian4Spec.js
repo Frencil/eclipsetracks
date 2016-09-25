@@ -3,14 +3,15 @@ defineSuite([
         'Core/Cartesian4',
         'Core/Color',
         'Core/Math',
+        'Specs/createPackableArraySpecs',
         'Specs/createPackableSpecs'
     ], function(
         Cartesian4,
         Color,
         CesiumMath,
+        createPackableArraySpecs,
         createPackableSpecs) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     it('construct with default values', function() {
         var cartesian = new Cartesian4();
@@ -85,7 +86,7 @@ defineSuite([
     it('clone without a result parameter', function() {
         var cartesian = new Cartesian4(1.0, 2.0, 3.0, 4.0);
         var result = Cartesian4.clone(cartesian, new Cartesian4());
-        expect(cartesian).toNotBe(result);
+        expect(cartesian).not.toBe(result);
         expect(cartesian).toEqual(result);
     });
 
@@ -93,7 +94,7 @@ defineSuite([
         var cartesian = new Cartesian4(1.0, 2.0, 3.0, 4.0);
         var result = new Cartesian4();
         var returnedResult = Cartesian4.clone(cartesian, result);
-        expect(cartesian).toNotBe(result);
+        expect(cartesian).not.toBe(result);
         expect(result).toBe(returnedResult);
         expect(cartesian).toEqual(result);
     });
@@ -902,4 +903,5 @@ defineSuite([
     });
 
     createPackableSpecs(Cartesian4, new Cartesian4(1, 2, 3, 4), [1, 2, 3, 4]);
+    createPackableArraySpecs(Cartesian4, [new Cartesian4(1, 2, 3, 4), new Cartesian4(5, 6, 7, 8)], [1, 2, 3, 4, 5, 6, 7, 8]);
 });

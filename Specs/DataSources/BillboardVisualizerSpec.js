@@ -13,9 +13,12 @@ defineSuite([
         'DataSources/ConstantProperty',
         'DataSources/EntityCollection',
         'Scene/BillboardCollection',
+        'Scene/HeightReference',
         'Scene/HorizontalOrigin',
         'Scene/VerticalOrigin',
-        'Specs/createScene'
+        'Specs/createGlobe',
+        'Specs/createScene',
+        'Specs/pollToPromise'
     ], function(
         BillboardVisualizer,
         BoundingRectangle,
@@ -30,17 +33,20 @@ defineSuite([
         ConstantProperty,
         EntityCollection,
         BillboardCollection,
+        HeightReference,
         HorizontalOrigin,
         VerticalOrigin,
-        createScene) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+        createGlobe,
+        createScene,
+        pollToPromise) {
+    'use strict';
 
     var scene;
     var visualizer;
 
     beforeAll(function() {
         scene = createScene();
+        scene.globe = createGlobe();
     });
 
     afterAll(function() {
@@ -128,58 +134,57 @@ defineSuite([
         var billboard = testObject.billboard = new BillboardGraphics();
         var bb;
 
-        runs(function() {
-            testObject.position = new ConstantProperty(new Cartesian3(1234, 5678, 9101112));
-            billboard.show = new ConstantProperty(true);
-            billboard.color = new ConstantProperty(new Color(0.5, 0.5, 0.5, 0.5));
-            billboard.image = new ConstantProperty('Data/Images/Blue.png');
-            billboard.imageSubRegion = new ConstantProperty(new BoundingRectangle(0, 0, 1, 1));
-            billboard.eyeOffset = new ConstantProperty(new Cartesian3(1.0, 2.0, 3.0));
-            billboard.scale = new ConstantProperty(12.5);
-            billboard.rotation = new ConstantProperty(1.5);
-            billboard.alignedAxis = new ConstantProperty(Cartesian3.UNIT_Z);
-            billboard.horizontalOrigin = new ConstantProperty(HorizontalOrigin.RIGHT);
-            billboard.verticalOrigin = new ConstantProperty(VerticalOrigin.TOP);
-            billboard.pixelOffset = new ConstantProperty(new Cartesian2(3, 2));
-            billboard.width = new ConstantProperty(15);
-            billboard.height = new ConstantProperty(5);
-            billboard.scaleByDistance = new ConstantProperty(new NearFarScalar());
-            billboard.translucencyByDistance = new ConstantProperty(new NearFarScalar());
-            billboard.pixelOffsetScaleByDistance = new ConstantProperty(new NearFarScalar(1.0, 0.0, 3.0e9, 0.0));
+        testObject.position = new ConstantProperty(new Cartesian3(1234, 5678, 9101112));
+        billboard.show = new ConstantProperty(true);
+        billboard.color = new ConstantProperty(new Color(0.5, 0.5, 0.5, 0.5));
+        billboard.image = new ConstantProperty('Data/Images/Blue.png');
+        billboard.imageSubRegion = new ConstantProperty(new BoundingRectangle(0, 0, 1, 1));
+        billboard.eyeOffset = new ConstantProperty(new Cartesian3(1.0, 2.0, 3.0));
+        billboard.scale = new ConstantProperty(12.5);
+        billboard.rotation = new ConstantProperty(1.5);
+        billboard.alignedAxis = new ConstantProperty(Cartesian3.UNIT_Z);
+        billboard.heightReference = new ConstantProperty(HeightReference.CLAMP_TO_GROUND);
+        billboard.horizontalOrigin = new ConstantProperty(HorizontalOrigin.RIGHT);
+        billboard.verticalOrigin = new ConstantProperty(VerticalOrigin.TOP);
+        billboard.pixelOffset = new ConstantProperty(new Cartesian2(3, 2));
+        billboard.width = new ConstantProperty(15);
+        billboard.height = new ConstantProperty(5);
+        billboard.scaleByDistance = new ConstantProperty(new NearFarScalar());
+        billboard.translucencyByDistance = new ConstantProperty(new NearFarScalar());
+        billboard.pixelOffsetScaleByDistance = new ConstantProperty(new NearFarScalar(1.0, 0.0, 3.0e9, 0.0));
+        billboard.sizeInMeters = new ConstantProperty(true);
 
+        visualizer.update(time);
+
+        var billboardCollection = scene.primitives.get(0);
+        expect(billboardCollection.length).toEqual(1);
+
+        bb = billboardCollection.get(0);
+
+        return pollToPromise(function() {
             visualizer.update(time);
+            return bb.show; //true once the image is loaded.
+        }).then(function() {
+            expect(bb.position).toEqual(testObject.position.getValue(time));
+            expect(bb.color).toEqual(testObject.billboard.color.getValue(time));
+            expect(bb.eyeOffset).toEqual(testObject.billboard.eyeOffset.getValue(time));
+            expect(bb.scale).toEqual(testObject.billboard.scale.getValue(time));
+            expect(bb.rotation).toEqual(testObject.billboard.rotation.getValue(time));
+            expect(bb.alignedAxis).toEqual(testObject.billboard.alignedAxis.getValue(time));
+            expect(bb.heightReference).toEqual(testObject.billboard.heightReference.getValue(time));
+            expect(bb.horizontalOrigin).toEqual(testObject.billboard.horizontalOrigin.getValue(time));
+            expect(bb.verticalOrigin).toEqual(testObject.billboard.verticalOrigin.getValue(time));
+            expect(bb.width).toEqual(testObject.billboard.width.getValue(time));
+            expect(bb.height).toEqual(testObject.billboard.height.getValue(time));
+            expect(bb.scaleByDistance).toEqual(testObject.billboard.scaleByDistance.getValue(time));
+            expect(bb.translucencyByDistance).toEqual(testObject.billboard.translucencyByDistance.getValue(time));
+            expect(bb.pixelOffsetScaleByDistance).toEqual(testObject.billboard.pixelOffsetScaleByDistance.getValue(time));
+            expect(bb.sizeInMeters).toEqual(testObject.billboard.sizeInMeters.getValue(time));
+            expect(bb._imageSubRegion).toEqual(testObject.billboard.imageSubRegion.getValue(time));
 
-            var billboardCollection = scene.primitives.get(0);
-            expect(billboardCollection.length).toEqual(1);
-
-            bb = billboardCollection.get(0);
-
-            waitsFor(function() {
-                visualizer.update(time);
-                if (bb.show) {
-                    expect(bb.position).toEqual(testObject.position.getValue(time));
-                    expect(bb.color).toEqual(testObject.billboard.color.getValue(time));
-                    expect(bb.eyeOffset).toEqual(testObject.billboard.eyeOffset.getValue(time));
-                    expect(bb.scale).toEqual(testObject.billboard.scale.getValue(time));
-                    expect(bb.rotation).toEqual(testObject.billboard.rotation.getValue(time));
-                    expect(bb.alignedAxis).toEqual(testObject.billboard.alignedAxis.getValue(time));
-                    expect(bb.horizontalOrigin).toEqual(testObject.billboard.horizontalOrigin.getValue(time));
-                    expect(bb.verticalOrigin).toEqual(testObject.billboard.verticalOrigin.getValue(time));
-                    expect(bb.width).toEqual(testObject.billboard.width.getValue(time));
-                    expect(bb.height).toEqual(testObject.billboard.height.getValue(time));
-                    expect(bb.scaleByDistance).toEqual(testObject.billboard.scaleByDistance.getValue(time));
-                    expect(bb.translucencyByDistance).toEqual(testObject.billboard.translucencyByDistance.getValue(time));
-                    expect(bb.pixelOffsetScaleByDistance).toEqual(testObject.billboard.pixelOffsetScaleByDistance.getValue(time));
-                    expect(bb._imageSubRegion).toEqual(testObject.billboard.imageSubRegion.getValue(time));
-                }
-                return bb.show; //true once the image is loaded.
-            });
-        });
-
-        runs(function() {
             billboard.show = new ConstantProperty(false);
 
-            waitsFor(function() {
+            return pollToPromise(function() {
                 visualizer.update(time);
                 return !bb.show;
             });
@@ -236,16 +241,15 @@ defineSuite([
         expect(billboardCollection.length).toEqual(1);
         var bb = billboardCollection.get(0);
 
-        waitsFor(function() {
+        return pollToPromise(function() {
             visualizer.update(time);
-            if (bb.show) {
-                //Clearing won't actually remove the billboard because of the
-                //internal cache used by the visualizer, instead it just hides it.
-                entityCollection.removeAll();
-                expect(bb.show).toEqual(false);
-                return true;
-            }
-            return false;
+            return bb.show;
+        }).then(function() {
+            //Clearing won't actually remove the billboard because of the
+            //internal cache used by the visualizer, instead it just hides it.
+            entityCollection.removeAll();
+            expect(bb.show).toEqual(false);
+            expect(bb.id).toBeUndefined();
         });
     });
 

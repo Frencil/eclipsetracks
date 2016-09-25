@@ -15,7 +15,7 @@ define([
         Event,
         createMaterialPropertyDescriptor,
         createPropertyDescriptor) {
-    "use strict";
+    'use strict';
 
     /**
      * Describes a cylinder, truncated cone, or cone defined by a length, top radius, and bottom radius.
@@ -35,11 +35,10 @@ define([
      * @param {Property} [options.outlineColor=Color.BLACK] A Property specifying the {@link Color} of the outline.
      * @param {Property} [options.outlineWidth=1.0] A numeric Property specifying the width of the outline.
      * @param {Property} [options.numberOfVerticalLines=16] A numeric Property specifying the number of vertical lines to draw along the perimeter for the outline.
-     * @param {Property} [options.slices=128] The number of edges around perimeter of the cylinder.
-     *
-     * @demo {@link http://cesiumjs.org/Cesium/Apps/Sandcastle/index.html?src=Cylinder.html|Cesium Sandcastle Cylinder Demo}
+     * @param {Property} [options.slices=128] The number of edges around the perimeter of the cylinder.
+     * @param {Property} [options.shadows=ShadowMode.DISABLED] An enum Property specifying whether the cylinder casts or receives shadows from each light source.
      */
-    var CylinderGraphics = function(options) {
+    function CylinderGraphics(options) {
         this._length = undefined;
         this._lengthSubscription = undefined;
         this._topRadius = undefined;
@@ -62,10 +61,13 @@ define([
         this._outlineColorSubscription = undefined;
         this._outlineWidth = undefined;
         this._outlineWidthSubscription = undefined;
+        this._shadows = undefined;
+        this._shadowsSubscription = undefined;
         this._definitionChanged = new Event();
 
         this.merge(defaultValue(options, defaultValue.EMPTY_OBJECT));
-    };
+    }
+
     defineProperties(CylinderGraphics.prototype, {
         /**
          * Gets the event that is raised whenever a property or sub-property is changed or modified.
@@ -103,7 +105,6 @@ define([
 
         /**
          * Gets or sets the Property specifying the number of vertical lines to draw along the perimeter for the outline.
-         * to use when outlining the cylinder.
          * @memberof CylinderGraphics.prototype
          * @type {Property}
          * @default 16
@@ -111,8 +112,7 @@ define([
         numberOfVerticalLines : createPropertyDescriptor('numberOfVerticalLines'),
 
         /**
-         * Gets or sets the Property specifying the number of edges around perimeter of the cylinder.
-         * between each latitude and longitude point.
+         * Gets or sets the Property specifying the number of edges around the perimeter of the cylinder.
          * @memberof CylinderGraphics.prototype
          * @type {Property}
          * @default 16
@@ -165,7 +165,16 @@ define([
          * @type {Property}
          * @default 1.0
          */
-        outlineWidth : createPropertyDescriptor('outlineWidth')
+        outlineWidth : createPropertyDescriptor('outlineWidth'),
+
+        /**
+         * Get or sets the enum Property specifying whether the cylinder
+         * casts or receives shadows from each light source.
+         * @memberof CylinderGraphics.prototype
+         * @type {Property}
+         * @default ShadowMode.DISABLED
+         */
+        shadows : createPropertyDescriptor('shadows')
     });
 
     /**
@@ -189,6 +198,7 @@ define([
         result.outline = this.outline;
         result.outlineColor = this.outlineColor;
         result.outlineWidth = this.outlineWidth;
+        result.shadows = this.shadows;
         return result;
     };
 
@@ -216,6 +226,7 @@ define([
         this.outline = defaultValue(this.outline, source.outline);
         this.outlineColor = defaultValue(this.outlineColor, source.outlineColor);
         this.outlineWidth = defaultValue(this.outlineWidth, source.outlineWidth);
+        this.shadows = defaultValue(this.shadows, source.shadows);
     };
 
     return CylinderGraphics;

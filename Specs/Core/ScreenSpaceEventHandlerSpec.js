@@ -5,6 +5,7 @@ defineSuite([
         'Core/clone',
         'Core/combine',
         'Core/defined',
+        'Core/FeatureDetection',
         'Core/KeyboardEventModifier',
         'Core/ScreenSpaceEventType',
         'Specs/DomEventSimulator'
@@ -14,13 +15,13 @@ defineSuite([
         clone,
         combine,
         defined,
+        FeatureDetection,
         KeyboardEventModifier,
         ScreenSpaceEventType,
         DomEventSimulator) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
-    var usePointerEvents = defined(window.PointerEvent);
+    var usePointerEvents = FeatureDetection.supportsPointerEvents();
     var element;
     var handler;
 
@@ -211,13 +212,13 @@ defineSuite([
 
             simulateInput();
 
-            expect(action.calls.length).toEqual(1);
+            expect(action.calls.count()).toEqual(1);
             expect(action).toHaveBeenCalledWith({
                 position : new Cartesian2(1, 2)
             });
 
             // should not be fired after removal
-            action.reset();
+            action.calls.reset();
 
             handler.removeInputAction(eventType, modifier);
 
@@ -253,12 +254,12 @@ defineSuite([
 
             simulateInput();
 
-            expect(action.calls.length).toEqual(1);
+            expect(action.calls.count()).toEqual(1);
             expect(action).toHaveBeenCalledWith({
                 position : new Cartesian2(1, 2)
             });
 
-            action.reset();
+            action.calls.reset();
 
             // down, move, then up
             function simulateInput2() {
@@ -278,13 +279,13 @@ defineSuite([
 
             simulateInput2();
 
-            expect(action.calls.length).toEqual(1);
+            expect(action.calls.count()).toEqual(1);
             expect(action).toHaveBeenCalledWith({
                 position : new Cartesian2(10, 11)
             });
 
             // should not be fired after removal
-            action.reset();
+            action.calls.reset();
 
             handler.removeInputAction(eventType, modifier);
 
@@ -321,13 +322,13 @@ defineSuite([
 
             simulateInput();
 
-            expect(action.calls.length).toEqual(1);
+            expect(action.calls.count()).toEqual(1);
             expect(action).toHaveBeenCalledWith({
                 position : new Cartesian2(1, 2)
             });
 
             // mouse clicks are not fired if the mouse moves too far away from the down position
-            action.reset();
+            action.calls.reset();
             simulateMouseDown(element, combine({
                 clientX : 1,
                 clientY : 2
@@ -340,7 +341,7 @@ defineSuite([
             expect(action).not.toHaveBeenCalled();
 
             // should not be fired after removal
-            action.reset();
+            action.calls.reset();
 
             handler.removeInputAction(eventType, modifier);
 
@@ -371,13 +372,13 @@ defineSuite([
 
             simulateInput();
 
-            expect(action.calls.length).toEqual(1);
+            expect(action.calls.count()).toEqual(1);
             expect(action).toHaveBeenCalledWith({
                 position : new Cartesian2(1, 2)
             });
 
             // should not be fired after removal
-            action.reset();
+            action.calls.reset();
 
             handler.removeInputAction(eventType, modifier);
 
@@ -412,14 +413,14 @@ defineSuite([
 
             simulateInput();
 
-            expect(action.calls.length).toEqual(2);
+            expect(action.calls.count()).toEqual(2);
             expect(action).toHaveBeenCalledWith({
                 startPosition : new Cartesian2(1, 2),
                 endPosition : new Cartesian2(2, 3)
             });
 
             // should not be fired after removal
-            action.reset();
+            action.calls.reset();
 
             handler.removeInputAction(eventType, modifier);
 
@@ -453,13 +454,13 @@ defineSuite([
 
                     simulateInput();
 
-                    expect(action.calls.length).toEqual(1);
+                    expect(action.calls.count()).toEqual(1);
 
                     // NOTE: currently the action is passed the value of 'wheelDelta' which is inverted from the standard 'deltaY'
                     expect(action).toHaveBeenCalledWith(-120);
 
                     // should not be fired after removal
-                    action.reset();
+                    action.calls.reset();
 
                     handler.removeInputAction(eventType, modifier);
 
@@ -474,7 +475,7 @@ defineSuite([
                 createAllMouseSpecCombinations(testWheelEvent, possibleButtons, possibleModifiers, possibleEventTypes);
             });
 
-        } else if (defined(document.onmousewheel)) {
+        } else if (document.onmousewheel !== undefined) {
 
             describe('using legacy mousewheel event', function() {
                 function testMouseWheelEvent(eventType, modifier, eventOptions) {
@@ -491,11 +492,11 @@ defineSuite([
 
                     simulateInput();
 
-                    expect(action.calls.length).toEqual(1);
+                    expect(action.calls.count()).toEqual(1);
                     expect(action).toHaveBeenCalledWith(-120);
 
                     // should not be fired after removal
-                    action.reset();
+                    action.calls.reset();
 
                     handler.removeInputAction(eventType, modifier);
 
@@ -543,13 +544,13 @@ defineSuite([
 
         simulateInput();
 
-        expect(action.calls.length).toEqual(1);
+        expect(action.calls.count()).toEqual(1);
         expect(action).toHaveBeenCalledWith({
             position : new Cartesian2(1, 2)
         });
 
         // should not be fired after removal
-        action.reset();
+        action.calls.reset();
 
         handler.removeInputAction(eventType);
 
@@ -602,14 +603,14 @@ defineSuite([
 
         simulateInput();
 
-        expect(action.calls.length).toEqual(1);
+        expect(action.calls.count()).toEqual(1);
         expect(action).toHaveBeenCalledWith({
             startPosition : new Cartesian2(1, 2),
             endPosition : new Cartesian2(10, 11)
         });
 
         // should not be fired after removal
-        action.reset();
+        action.calls.reset();
 
         handler.removeInputAction(eventType);
 
@@ -662,12 +663,12 @@ defineSuite([
 
         simulateInput();
 
-        expect(action.calls.length).toEqual(1);
+        expect(action.calls.count()).toEqual(1);
         expect(action).toHaveBeenCalledWith({
             position : new Cartesian2(1, 2)
         });
 
-        action.reset();
+        action.calls.reset();
 
         // start, move, then end
         function simulateInput2() {
@@ -718,13 +719,13 @@ defineSuite([
 
         simulateInput2();
 
-        expect(action.calls.length).toEqual(1);
+        expect(action.calls.count()).toEqual(1);
         expect(action).toHaveBeenCalledWith({
             position : new Cartesian2(10, 11)
         });
 
         // should not be fired after removal
-        action.reset();
+        action.calls.reset();
 
         handler.removeInputAction(eventType);
 
@@ -780,14 +781,14 @@ defineSuite([
 
         simulateInput();
 
-        expect(action.calls.length).toEqual(1);
+        expect(action.calls.count()).toEqual(1);
         expect(action).toHaveBeenCalledWith({
             position1 : new Cartesian2(1, 2),
             position2 : new Cartesian2(3, 4)
         });
 
         // should not be fired after removal
-        action.reset();
+        action.calls.reset();
 
         handler.removeInputAction(eventType);
 
@@ -872,7 +873,7 @@ defineSuite([
 
         if (usePointerEvents) {
             // because every pointer event is separate, one touch moves, then the other.
-            expect(action.calls.length).toEqual(2);
+            expect(action.calls.count()).toEqual(2);
 
             // intermediate delta X: -6
             // intermediate delta Y: -8
@@ -898,7 +899,7 @@ defineSuite([
             });
         } else {
             // touch events can move both touches simultaneously
-            expect(action.calls.length).toEqual(1);
+            expect(action.calls.count()).toEqual(1);
             expect(action).toHaveBeenCalledWith({
                 distance : {
                     startPosition : new Cartesian2(0, Math.sqrt(3 * 3 + 1 * 1) * 0.25),
@@ -912,7 +913,7 @@ defineSuite([
         }
 
         // should not be fired after removal
-        action.reset();
+        action.calls.reset();
 
         handler.removeInputAction(eventType);
 
@@ -965,13 +966,13 @@ defineSuite([
 
         simulateInput();
 
-        expect(action.calls.length).toEqual(1);
+        expect(action.calls.count()).toEqual(1);
         expect(action).toHaveBeenCalledWith({
             position : new Cartesian2(1, 2)
         });
 
         // should not be fired after removal
-        action.reset();
+        action.calls.reset();
 
         handler.removeInputAction(eventType);
 
@@ -989,16 +990,16 @@ defineSuite([
     it('unregisters event listeners when destroyed', function() {
         handler = handler.destroy();
 
-        spyOn(element, 'addEventListener').andCallThrough();
-        spyOn(element, 'removeEventListener').andCallThrough();
+        spyOn(element, 'addEventListener').and.callThrough();
+        spyOn(element, 'removeEventListener').and.callThrough();
 
         handler = new ScreenSpaceEventHandler(element);
 
-        expect(element.addEventListener.callCount).not.toEqual(0);
-        expect(element.removeEventListener.callCount).toEqual(0);
+        expect(element.addEventListener.calls.count()).not.toEqual(0);
+        expect(element.removeEventListener.calls.count()).toEqual(0);
 
         handler.destroy();
 
-        expect(element.removeEventListener.callCount).toEqual(element.addEventListener.callCount);
+        expect(element.removeEventListener.calls.count()).toEqual(element.addEventListener.calls.count());
     });
 });

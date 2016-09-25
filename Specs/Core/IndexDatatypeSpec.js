@@ -5,8 +5,7 @@ defineSuite([
     ], function(
         IndexDatatype,
         CesiumMath) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     it('IndexDatatype.validate validates input', function() {
         expect(IndexDatatype.validate(IndexDatatype.UNSIGNED_SHORT)).toEqual(true);

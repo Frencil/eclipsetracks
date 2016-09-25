@@ -1,4 +1,4 @@
-/*global defineSuite */
+/*global defineSuite*/
 defineSuite([
         'Core/buildModuleUrl',
         'Core/loadText',
@@ -7,24 +7,16 @@ defineSuite([
         buildModuleUrl,
         loadText,
         Uri) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     it('produces an absolute URL for a module', function() {
-        var url = buildModuleUrl('Workers/sanitizeHtml.js');
+        var url = buildModuleUrl('Workers/transferTypedArrayTest.js');
 
-        expect(url).toMatch(/Workers\/sanitizeHtml.js$/);
+        expect(url).toMatch(/Workers\/transferTypedArrayTest.js$/);
         expect(new Uri(url).isAbsolute()).toBe(true);
 
         // make sure it actually exists at that URL
-        var loaded = false;
-        loadText(url).then(function() {
-            loaded = true;
-        });
-
-        waitsFor(function() {
-            return loaded;
-        });
+        return loadText(url);
     });
 
     it('matches the expected forms of URLs to Cesium.js', function() {

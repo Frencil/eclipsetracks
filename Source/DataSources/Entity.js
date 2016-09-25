@@ -5,7 +5,6 @@ define([
         '../Core/defaultValue',
         '../Core/defined',
         '../Core/defineProperties',
-        '../Core/deprecationWarning',
         '../Core/DeveloperError',
         '../Core/Event',
         '../Core/Matrix3',
@@ -37,7 +36,6 @@ define([
         defaultValue,
         defined,
         defineProperties,
-        deprecationWarning,
         DeveloperError,
         Event,
         Matrix3,
@@ -63,7 +61,7 @@ define([
         Property,
         RectangleGraphics,
         WallGraphics) {
-    "use strict";
+    'use strict';
 
     function createConstantPositionProperty(value) {
         return new ConstantPositionProperty(value);
@@ -92,6 +90,8 @@ define([
      * @param {Object} [options] Object with the following properties:
      * @param {String} [options.id] A unique identifier for this object. If none is provided, a GUID is generated.
      * @param {String} [options.name] A human readable name to display to users. It does not have to be unique.
+     * @param {TimeIntervalCollection} [options.availability] The availability, if any, associated with this object.
+     * @param {Boolean} [options.show] A boolean value indicating if the entity and its children are displayed.
      * @param {Property} [options.description] A string Property specifying an HTML description for this entity.
      * @param {PositionProperty} [options.position] A Property specifying the entity position.
      * @param {Property} [options.orientation] A Property specifying the entity orientation.
@@ -113,18 +113,12 @@ define([
      * @param {RectangleGraphics} [options.rectangle] A rectangle to associate with this entity.
      * @param {WallGraphics} [options.wall] A wall to associate with this entity.
      *
-     * @see {@link http://cesiumjs.org/2015/02/02/Visualizing-Spatial-Data/|Visualizing Special Data}
+     * @see {@link http://cesiumjs.org/2015/02/02/Visualizing-Spatial-Data/|Visualizing Spatial Data}
      */
-    var Entity = function(options) {
+    function Entity(options) {
         options = defaultValue(options, defaultValue.EMPTY_OBJECT);
 
         var id = options.id;
-        if (typeof options === 'string') {
-            deprecationWarning('Entity', 'The Entity constructor taking a string was deprecated in Cesium 1.5.  It will be removed in 1.9.  Use "new Entity({ id : \'id\'})" instead.');
-            id = options;
-            options = defaultValue.EMPTY_OBJECT;
-        }
-
         if (!defined(id)) {
             id = createGuid();
         }
@@ -132,8 +126,9 @@ define([
         this._availability = undefined;
         this._id = id;
         this._definitionChanged = new Event();
-        this._name = undefined;
-        this._parent = options.parent;
+        this._name = options.name;
+        this._show = defaultValue(options.show, true);
+        this._parent = undefined;
         this._propertyNames = ['billboard', 'box', 'corridor', 'cylinder', 'description', 'ellipse', //
                                'ellipsoid', 'label', 'model', 'orientation', 'path', 'point', 'polygon', //
                                'polyline', 'polylineVolume', 'position', 'rectangle', 'viewFrom', 'wall'];
@@ -176,9 +171,31 @@ define([
         this._viewFromSubscription = undefined;
         this._wall = undefined;
         this._wallSubscription = undefined;
+        this._children = [];
 
-        this.merge(defaultValue(options, defaultValue.EMPTY_OBJECT));
-    };
+        /**
+         * Gets or sets the entity collection that this entity belongs to.
+         * @type {EntityCollection}
+         */
+        this.entityCollection = undefined;
+
+        this.parent = options.parent;
+        this.merge(options);
+    }
+
+    function updateShow(entity, children, isShowing) {
+        var length = children.length;
+        for (var i = 0; i < length; i++) {
+            var child = children[i];
+            var childShow = child._show;
+            var oldValue = !isShowing && childShow;
+            var newValue = isShowing && childShow;
+            if (oldValue !== newValue) {
+                updateShow(child, child._children, isShowing);
+            }
+        }
+        entity._definitionChanged.raiseEvent(entity, 'isShowing', isShowing, !isShowing);
+    }
 
     defineProperties(Entity.prototype, {
         /**
@@ -219,17 +236,48 @@ define([
          * @memberof Entity.prototype
          * @type {String}
          */
-        name : {
-            configurable : false,
+        name : createRawPropertyDescriptor('name'),
+        /**
+         * Gets or sets whether this entity should be displayed. When set to true,
+         * the entity is only displayed if the parent entity's show property is also true.
+         * @memberof Entity.prototype
+         * @type {Boolean}
+         */
+        show : {
             get : function() {
-                return this._name;
+                return this._show;
             },
             set : function(value) {
-                var oldValue = this._name;
-                if (oldValue !== value) {
-                    this._name = value;
-                    this._definitionChanged.raiseEvent(this, 'name', value, oldValue);
+                //>>includeStart('debug', pragmas.debug);
+                if (!defined(value)) {
+                    throw new DeveloperError('value is required.');
                 }
+                //>>includeEnd('debug');
+
+                if (value === this._show) {
+                    return;
+                }
+
+                var wasShowing = this.isShowing;
+                this._show = value;
+                var isShowing = this.isShowing;
+
+                if (wasShowing !== isShowing) {
+                    updateShow(this, this._children, isShowing);
+                }
+
+                this._definitionChanged.raiseEvent(this, 'show', value, !value);
+            }
+        },
+        /**
+         * Gets whether this entity is being displayed, taking into account
+         * the visibility of any ancestor entities.
+         * @memberof Entity.prototype
+         * @type {Boolean}
+         */
+        isShowing : {
+            get : function() {
+                return this._show && (!defined(this.entityCollection) || this.entityCollection.show) && (!defined(this._parent) || this._parent.isShowing);
             }
         },
         /**
@@ -237,11 +285,41 @@ define([
          * @memberof Entity.prototype
          * @type {Entity}
          */
-        parent : createRawPropertyDescriptor('parent'),
+        parent : {
+            get : function() {
+                return this._parent;
+            },
+            set : function(value) {
+                var oldValue = this._parent;
+
+                if (oldValue === value) {
+                    return;
+                }
+
+                var wasShowing = this.isShowing;
+                if (defined(oldValue)) {
+                    var index = oldValue._children.indexOf(this);
+                    oldValue._children.splice(index, 1);
+                }
+
+                this._parent = value;
+                if (defined(value)) {
+                    value._children.push(this);
+                }
+
+                var isShowing = this.isShowing;
+
+                if (wasShowing !== isShowing) {
+                    updateShow(this, this._children, isShowing);
+                }
+
+                this._definitionChanged.raiseEvent(this, 'parent', value, oldValue);
+            }
+        },
         /**
          * Gets the names of all properties registered on this instance.
          * @memberof Entity.prototype
-         * @type {Event}
+         * @type {Array}
          */
         propertyNames : {
             get : function() {
@@ -369,7 +447,7 @@ define([
      * Given a time, returns true if this object should have data during that time.
      *
      * @param {JulianDate} time The time to check availability for.
-     * @returns true if the object should have data during the provided time, false otherwise.
+     * @returns {Boolean} true if the object should have data during the provided time, false otherwise.
      */
     Entity.prototype.isAvailable = function(time) {
         //>>includeStart('debug', pragmas.debug);
@@ -421,17 +499,18 @@ define([
      */
     Entity.prototype.removeProperty = function(propertyName) {
         var propertyNames = this._propertyNames;
+        var index = propertyNames.indexOf(propertyName);
 
         //>>includeStart('debug', pragmas.debug);
         if (!defined(propertyName)) {
             throw new DeveloperError('propertyName is required.');
         }
-        if (propertyNames.indexOf(propertyName) === -1) {
+        if (index === -1) {
             throw new DeveloperError(propertyName + ' is not a registered property.');
         }
         //>>includeEnd('debug');
 
-        this._propertyNames.push(propertyName);
+        this._propertyNames.splice(index, 1);
         delete this[propertyName];
     };
 
@@ -448,7 +527,8 @@ define([
         }
         //>>includeEnd('debug');
 
-        //Name and availability are not Property objects and are currently handled differently.
+        //Name, show, and availability are not Property objects and are currently handled differently.
+        //source.show is intentionally ignored because this.show always has a value.
         this.name = defaultValue(this.name, source.name);
         this.availability = defaultValue(source.availability, this.availability);
 

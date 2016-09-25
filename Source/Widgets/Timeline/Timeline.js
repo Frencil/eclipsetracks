@@ -17,7 +17,7 @@ define([
         getElement,
         TimelineHighlightRange,
         TimelineTrack) {
-    "use strict";
+    'use strict';
 
     var timelineWheelDelta = 1e12;
 
@@ -82,7 +82,7 @@ define([
      * @param {Element} container The parent HTML container node for this widget.
      * @param {Clock} clock The clock to use.
      */
-    var Timeline = function(container, clock) {
+    function Timeline(container, clock) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(container)) {
             throw new DeveloperError('container is required.');
@@ -165,7 +165,7 @@ define([
 
         clock.onTick.addEventListener(this.updateFromClock, this);
         this.updateFromClock();
-    };
+    }
 
     /**
      * @private
@@ -702,9 +702,9 @@ define([
             var len = e.touches.length, leftX = timeline._topDiv.getBoundingClientRect().left;
             if (timeline._touchMode === timelineTouchMode.singleTap) {
                 timeline._touchMode = timelineTouchMode.scrub;
-                timeline._handleTouchMove(e);
+                timeline._onTouchMove(e);
             } else if (timeline._touchMode === timelineTouchMode.scrub) {
-                timeline._handleTouchMove(e);
+                timeline._onTouchMove(e);
             }
             timeline._mouseMode = timelineMouseMode.touchOnly;
             if (len !== 1) {
@@ -784,6 +784,7 @@ define([
         this._trackListEle.height = trackListHeight;
         this._makeTics();
 
+        this._lastXPos = undefined;
         this._lastWidth = width;
         this._lastHeight = height;
     };

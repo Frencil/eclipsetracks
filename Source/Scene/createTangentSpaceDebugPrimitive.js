@@ -19,7 +19,7 @@ define([
         Matrix4,
         PerInstanceColorAppearance,
         Primitive) {
-    "use strict";
+    'use strict';
 
     /**
      * Creates a {@link Primitive} to visualize well-known vector vertex attributes:
@@ -95,6 +95,7 @@ define([
 
         if (instances.length > 0) {
             return new Primitive({
+                asynchronous : false,
                 geometryInstances : instances,
                 appearance : new PerInstanceColorAppearance({
                     flat : true,

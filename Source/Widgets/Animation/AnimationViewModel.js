@@ -23,23 +23,11 @@ define([
         sprintf,
         createCommand,
         ToggleButtonViewModel) {
-    "use strict";
+    'use strict';
 
     var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var realtimeShuttleRingAngle = 15;
     var maxShuttleRingAngle = 105;
-
-    function cancelRealtime(clockViewModel) {
-        if (clockViewModel.clockStep === ClockStep.SYSTEM_CLOCK) {
-            clockViewModel.clockStep = ClockStep.SYSTEM_CLOCK_MULTIPLIER;
-            clockViewModel.multiplier = 1;
-        }
-    }
-
-    function unpause(clockViewModel) {
-        cancelRealtime(clockViewModel);
-        clockViewModel.shouldAnimate = true;
-    }
 
     function numberComparator(left, right) {
         return left - right;
@@ -81,6 +69,13 @@ define([
             return multiplier * realtimeShuttleRingAngle;
         }
 
+        var fastedMultipler = shuttleRingTicks[shuttleRingTicks.length - 1];
+        if(multiplier > fastedMultipler){
+            multiplier = fastedMultipler;
+        } else if(multiplier < -fastedMultipler){
+            multiplier = -fastedMultipler;
+        }
+
         var minp = realtimeShuttleRingAngle;
         var maxp = maxShuttleRingAngle;
         var maxv;
@@ -88,7 +83,7 @@ define([
         var scale;
 
         if (multiplier > 0) {
-            maxv = Math.log(shuttleRingTicks[shuttleRingTicks.length - 1]);
+            maxv = Math.log(fastedMultipler);
             scale = (maxv - minv) / (maxp - minp);
             return (Math.log(multiplier) - minv) / scale + minp;
         }
@@ -107,7 +102,7 @@ define([
      *
      * @see Animation
      */
-    var AnimationViewModel = function(clockViewModel) {
+    function AnimationViewModel(clockViewModel) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(clockViewModel)) {
             throw new DeveloperError('clockViewModel is required.');
@@ -277,10 +272,9 @@ define([
         var pauseCommand = createCommand(function() {
             var clockViewModel = that._clockViewModel;
             if (clockViewModel.shouldAnimate) {
-                cancelRealtime(clockViewModel);
                 clockViewModel.shouldAnimate = false;
             } else if (that._canAnimate) {
-                unpause(clockViewModel);
+                clockViewModel.shouldAnimate = true;
             }
         });
 
@@ -293,7 +287,6 @@ define([
 
         var playReverseCommand = createCommand(function() {
             var clockViewModel = that._clockViewModel;
-            cancelRealtime(clockViewModel);
             var multiplier = clockViewModel.multiplier;
             if (multiplier > 0) {
                 clockViewModel.multiplier = -multiplier;
@@ -310,7 +303,6 @@ define([
 
         var playForwardCommand = createCommand(function() {
             var clockViewModel = that._clockViewModel;
-            cancelRealtime(clockViewModel);
             var multiplier = clockViewModel.multiplier;
             if (multiplier < 0) {
                 clockViewModel.multiplier = -multiplier;
@@ -326,15 +318,12 @@ define([
         });
 
         var playRealtimeCommand = createCommand(function() {
-            var clockViewModel = that._clockViewModel;
-            clockViewModel.clockStep = ClockStep.SYSTEM_CLOCK;
-            clockViewModel.multiplier = 1.0;
-            clockViewModel.shouldAnimate = true;
+            that._clockViewModel.clockStep = ClockStep.SYSTEM_CLOCK;
         }, knockout.getObservable(this, '_isSystemTimeAvailable'));
 
         this._playRealtimeViewModel = new ToggleButtonViewModel(playRealtimeCommand, {
             toggled : knockout.computed(function() {
-                return clockViewModel.shouldAnimate && clockViewModel.clockStep === ClockStep.SYSTEM_CLOCK;
+                return clockViewModel.clockStep === ClockStep.SYSTEM_CLOCK;
             }),
             tooltip : knockout.computed(function() {
                 return that._isSystemTimeAvailable ? 'Today (real-time)' : 'Current time not in range';
@@ -343,7 +332,6 @@ define([
 
         this._slower = createCommand(function() {
             var clockViewModel = that._clockViewModel;
-            cancelRealtime(clockViewModel);
             var shuttleRingTicks = that._allShuttleRingTicks;
             var multiplier = clockViewModel.multiplier;
             var index = getTypicalMultiplierIndex(multiplier, shuttleRingTicks) - 1;
@@ -354,7 +342,6 @@ define([
 
         this._faster = createCommand(function() {
             var clockViewModel = that._clockViewModel;
-            cancelRealtime(clockViewModel);
             var shuttleRingTicks = that._allShuttleRingTicks;
             var multiplier = clockViewModel.multiplier;
             var index = getTypicalMultiplierIndex(multiplier, shuttleRingTicks) + 1;
@@ -362,7 +349,7 @@ define([
                 clockViewModel.multiplier = shuttleRingTicks[index];
             }
         });
-    };
+    }
 
     /**
      * Gets or sets the default date formatter used by new instances.
@@ -377,6 +364,7 @@ define([
 
     /**
      * Gets or sets the default array of known clock multipliers associated with new instances of the shuttle ring.
+     * @type {Number[]}
      */
     AnimationViewModel.defaultTicks = [//
     0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0,//
@@ -401,7 +389,7 @@ define([
     /**
      * Gets a copy of the array of positive known clock multipliers to associate with the shuttle ring.
      *
-     * @returns The array of known clock multipliers associated with the shuttle ring.
+     * @returns {Number[]} The array of known clock multipliers associated with the shuttle ring.
      */
     AnimationViewModel.prototype.getShuttleRingTicks = function() {
         return this._sortedFilteredPositiveTicks.slice(0);

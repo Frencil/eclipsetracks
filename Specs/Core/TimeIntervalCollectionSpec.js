@@ -7,8 +7,7 @@ defineSuite([
         TimeIntervalCollection,
         JulianDate,
         TimeInterval) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     function TestObject(value) {
         this.value = value;
@@ -30,6 +29,28 @@ defineSuite([
         expect(intervals.isStartIncluded).toEqual(false);
         expect(intervals.isStopIncluded).toEqual(false);
         expect(intervals.isEmpty).toEqual(true);
+        expect(intervals.changedEvent).toBeDefined();
+    });
+
+    it('constructing an interval collection from array.', function() {
+        var arg = [new TimeInterval({
+            start : new JulianDate(1),
+            stop : new JulianDate(2),
+            isStartIncluded : true,
+            isStopIncluded : false
+        }), new TimeInterval({
+            start : new JulianDate(2),
+            stop : new JulianDate(3),
+            isStartIncluded : false,
+            isStopIncluded : true
+        })];
+        var intervals = new TimeIntervalCollection(arg);
+        expect(intervals.length).toEqual(2);
+        expect(intervals.start).toEqual(arg[0].start);
+        expect(intervals.stop).toEqual(arg[1].stop);
+        expect(intervals.isStartIncluded).toEqual(true);
+        expect(intervals.isStopIncluded).toEqual(true);
+        expect(intervals.isEmpty).toEqual(false);
         expect(intervals.changedEvent).toBeDefined();
     });
 
@@ -668,6 +689,47 @@ defineSuite([
         expect(intervals.get(1).isStopIncluded).toEqual(true);
     });
 
+    it('removeInterval removes overlapped intervals', function() {
+        var intervals = new TimeIntervalCollection();
+
+        intervals.addInterval(new TimeInterval({
+            start : new JulianDate(1),
+            stop : new JulianDate(2),
+            isStartIncluded : true,
+            isStopIncluded : false
+        }));
+        intervals.addInterval(new TimeInterval({
+            start : new JulianDate(2),
+            stop : new JulianDate(3),
+            isStartIncluded : false,
+            isStopIncluded : false
+        }));
+        intervals.addInterval(new TimeInterval({
+            start : new JulianDate(3),
+            stop : new JulianDate(4),
+            isStartIncluded : false,
+            isStopIncluded : false
+        }));
+        intervals.addInterval(new TimeInterval({
+            start : new JulianDate(4),
+            stop : new JulianDate(5),
+            isStartIncluded : false,
+            isStopIncluded : true
+        }));
+
+        var removedInterval = new TimeInterval({
+            start : new JulianDate(2),
+            stop : new JulianDate(4),
+            isStartIncluded : false,
+            isStopIncluded : false
+        });
+
+        expect(intervals.length).toEqual(4);
+        expect(intervals.removeInterval(removedInterval)).toEqual(true);
+
+        expect(intervals.length).toEqual(2);
+    });
+
     it('intersect works with an empty collection', function() {
         var left = new TimeIntervalCollection();
         left.addInterval(new TimeInterval({
@@ -912,13 +974,13 @@ defineSuite([
 
         intervals.addInterval(interval);
         expect(listener).toHaveBeenCalledWith(intervals);
-        listener.reset();
+        listener.calls.reset();
 
         intervals.removeInterval(interval);
         expect(listener).toHaveBeenCalledWith(intervals);
 
         intervals.addInterval(interval);
-        listener.reset();
+        listener.calls.reset();
         intervals.removeAll();
         expect(listener).toHaveBeenCalledWith(intervals);
     });

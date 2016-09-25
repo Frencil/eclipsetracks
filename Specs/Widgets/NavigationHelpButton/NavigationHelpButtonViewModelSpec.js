@@ -3,8 +3,7 @@ defineSuite([
         'Widgets/NavigationHelpButton/NavigationHelpButtonViewModel'
     ], function(
         NavigationHelpButtonViewModel) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+    'use strict';
 
     it('Can construct', function() {
         var viewModel = new NavigationHelpButtonViewModel();

@@ -17,7 +17,7 @@ define([
         GeographicProjection,
         Intersect,
         Rectangle) {
-    "use strict";
+    'use strict';
 
     /**
      * A bounding rectangle given by a corner, width and height.
@@ -30,8 +30,9 @@ define([
      * @param {Number} [height=0.0] The height of the rectangle.
      *
      * @see BoundingSphere
+     * @see Packable
      */
-    var BoundingRectangle = function(x, y, width, height) {
+    function BoundingRectangle(x, y, width, height) {
         /**
          * The x coordinate of the rectangle.
          * @type {Number}
@@ -59,6 +60,68 @@ define([
          * @default 0.0
          */
         this.height = defaultValue(height, 0.0);
+    }
+
+    /**
+     * The number of elements used to pack the object into an array.
+     * @type {Number}
+     */
+    BoundingRectangle.packedLength = 4;
+
+    /**
+     * Stores the provided instance into the provided array.
+     *
+     * @param {BoundingRectangle} value The value to pack.
+     * @param {Number[]} array The array to pack into.
+     * @param {Number} [startingIndex=0] The index into the array at which to start packing the elements.
+     *
+     * @returns {Number[]} The array that was packed into
+     */
+    BoundingRectangle.pack = function(value, array, startingIndex) {
+        //>>includeStart('debug', pragmas.debug);
+        if (!defined(value)) {
+            throw new DeveloperError('value is required');
+        }
+        if (!defined(array)) {
+            throw new DeveloperError('array is required');
+        }
+        //>>includeEnd('debug');
+
+        startingIndex = defaultValue(startingIndex, 0);
+
+        array[startingIndex++] = value.x;
+        array[startingIndex++] = value.y;
+        array[startingIndex++] = value.width;
+        array[startingIndex] = value.height;
+
+        return array;
+    };
+
+    /**
+     * Retrieves an instance from a packed array.
+     *
+     * @param {Number[]} array The packed array.
+     * @param {Number} [startingIndex=0] The starting index of the element to be unpacked.
+     * @param {BoundingRectangle} [result] The object into which to store the result.
+     * @returns {BoundingRectangle} The modified result parameter or a new BoundingRectangle instance if one was not provided.
+     */
+    BoundingRectangle.unpack = function(array, startingIndex, result) {
+        //>>includeStart('debug', pragmas.debug);
+        if (!defined(array)) {
+            throw new DeveloperError('array is required');
+        }
+        //>>includeEnd('debug');
+
+        startingIndex = defaultValue(startingIndex, 0);
+
+        if (!defined(result)) {
+            result = new BoundingRectangle();
+        }
+        result.x = array[startingIndex++];
+        result.y = array[startingIndex++];
+        result.width = array[startingIndex++];
+        result.height = array[startingIndex];
+        return result;
     };
 
     /**
