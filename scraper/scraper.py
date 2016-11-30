@@ -316,8 +316,8 @@ class EclipseTrack:
         iso = self.date.isoformat()
 
         # Generate time-specific lists for various objects
-        north_polyline_degrees = []
         central_polyline_degrees = []
+        north_polyline_degrees = []
         south_polyline_degrees = []
         ellipse_position = []
         ellipse_semiMajorAxis = []
@@ -386,7 +386,7 @@ class EclipseTrack:
             ellipse_position += [time, central[0], central[1], 0.0]
             ellipse_semiMajorAxis += [time, round(semi_major_axis, 3)]
             ellipse_semiMinorAxis += [time, round(semi_minor_axis, 3)]
-            ellipse_rotation += [time, round(rotation, 3)]
+            ellipse_rotation += [time, round(rotation, 3)]        
 
         # Generate document packet with clock
         start_time = iso + "T" + self.time[0] + ":00Z"
@@ -401,34 +401,34 @@ class EclipseTrack:
         packet.clock = c
         doc.packets.append(packet)
 
-        # Generate north polyline packet
-        packet_id = iso + '_north_polyline'
+        # Generate a polyline packet for the north and south polylines, connected and filled
+        limit_polyline_degrees = list(north_polyline_degrees)
+        point = len(south_polyline_degrees)/3
+        while (point > 0):
+            offset = (point-1) * 3
+            limit_polyline_degrees += [ south_polyline_degrees[offset],
+                                        south_polyline_degrees[offset+1],
+                                        south_polyline_degrees[offset+2] ]
+            point -= 1
+        packet_id = iso + '_bounds_polygon'
         packet = czml.CZMLPacket(id=packet_id)
-        nsc = czml.SolidColor(color=czml.Color(rgba=(255, 255, 255, 128)))
-        nmat = czml.Material(solidColor=nsc)
-        npos = czml.Positions(cartographicDegrees=north_polyline_degrees)
-        npl = czml.Polyline(show=True, width=1, followSurface=True, material=nmat, positions=npos)
-        packet.polyline = npl
+        boc = czml.Color(rgba=(232, 72, 68, 255))
+        bsc = czml.SolidColor(color=czml.Color(rgba=(0, 0, 0, 66)))
+        bmat = czml.Material(solidColor=bsc)
+        bdeg = limit_polyline_degrees
+        bpos = czml.Positions(cartographicDegrees=bdeg)
+        bpg = czml.Polygon(show=True, outline=True, outlineColor=boc, outlineWidth=2, material=bmat, positions=bpos)
+        packet.polygon = bpg
         doc.packets.append(packet)
 
         # Generate central polyline packet
         packet_id = iso + '_central_polyline'
         packet = czml.CZMLPacket(id=packet_id)
-        cpg = czml.PolylineGlow(glowPower=0.25, color=czml.Color(rgba=(223, 150, 47, 128)))
-        cmat = czml.Material(polylineGlow=cpg)
+        csc = czml.SolidColor(color=czml.Color(rgba=(241, 226, 57, 255)))
+        cmat = czml.Material(solidColor=csc)
         cpos = czml.Positions(cartographicDegrees=central_polyline_degrees)
-        cpl = czml.Polyline(show=True, width=5, followSurface=True, material=cmat, positions=cpos)
+        cpl = czml.Polyline(show=True, width=4, followSurface=True, material=cmat, positions=cpos)
         packet.polyline = cpl
-        doc.packets.append(packet)
-
-        # Generate south polyline packet
-        packet_id = iso + '_south_polyline'
-        packet = czml.CZMLPacket(id=packet_id)
-        ssc = czml.SolidColor(color=czml.Color(rgba=(255, 255, 255, 128)))
-        smat = czml.Material(solidColor=ssc)
-        spos = czml.Positions(cartographicDegrees=south_polyline_degrees)
-        spl = czml.Polyline(show=True, width=1, followSurface=True, material=smat, positions=spos)
-        packet.polyline = spl
         doc.packets.append(packet)
 
         # Generate ellipse shadow packet
