@@ -1,1 +1,1 @@
-{"type": "annular", "camera_position": [102.317, 1.0, 10000000.0], "iso": "2019-12-26", "regions": ["indian ocean", "middle east", "north pacific", "southeastern asia"]}
+{"regions": ["indian ocean", "middle east", "north pacific", "southeastern asia"], "type": "annular", "iso": "2019-12-26", "camera_position": [102.317, 1.0, 10000000.0]}
