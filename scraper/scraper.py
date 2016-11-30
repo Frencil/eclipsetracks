@@ -417,7 +417,7 @@ class EclipseTrack:
         bmat = czml.Material(solidColor=bsc)
         bdeg = limit_polyline_degrees
         bpos = czml.Positions(cartographicDegrees=bdeg)
-        bpg = czml.Polygon(show=True, outline=True, outlineColor=boc, outlineWidth=2, material=bmat, positions=bpos)
+        bpg = czml.Polygon(show=True, height=0, outline=True, outlineColor=boc, outlineWidth=2, material=bmat, positions=bpos)
         packet.polygon = bpg
         doc.packets.append(packet)
 
