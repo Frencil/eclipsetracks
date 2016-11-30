@@ -11,11 +11,9 @@
   <meta name="description" content="Open source WebGL-powered interactive 3D visualization of solar eclipse events around the planet">
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <title>Eclipsetracks.org - Interactive Solar Eclipses with CesiumJS</title>
-  <script src="//frencil.github.io/eclipsetracks/cesium/Build/Cesium/Cesium.js?t=1474824788"></script>
-  <link rel="stylesheet" href="//frencil.github.io/eclipsetracks/cesium/Build/Cesium/Widgets/widgets.css?t=1474824788">
-  <link rel="stylesheet" href="//frencil.github.io/eclipsetracks/bootstrap.min.css?t=1474824788">
-  <!-- script src="cesium/Build/Cesium/Cesium.js?t=1474824788"></script -->
-  <!-- link rel="stylesheet" href="cesium/Build/Cesium/Widgets/widgets.css?t=1474824788" -->
+  <script src="//cesiumjs.org/releases/1.27/Build/Cesium/Cesium.js"></script>
+  <link rel="stylesheet" href="//cesiumjs.org/releases/1.27/Build/Cesium/Widgets/widgets.css">
+  <link rel="stylesheet" href="//frencil.github.io/eclipsetracks/bootstrap.min.css?t=1474824789">
   <!-- link rel="stylesheet" href="bootstrap.min.css?t=1474824788" -->
   <link rel="stylesheet" href="main.css?t=1474824788">
 </head>
@@ -66,7 +64,7 @@
   <div id="cesiumContainer"></div>
 
   <!-- Load primary application JavaScript and data -->
-  <script language="JavaScript" src="setup.js?t=1474824788"></script>
+  <script language="JavaScript" src="setup.js?t=1474824789"></script>
   <iframe id="czml_events" src="czml/events.txt" onload="eclipses.loadEvents();" style="display: none;"></iframe>
 
   <!-- Piwik -->

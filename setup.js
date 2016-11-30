@@ -29,9 +29,6 @@ var viewer = new Cesium.Viewer('cesiumContainer', {
 // Turn on day/night lighting
 viewer.scene.globe.enableLighting = true;
 
-// Define camera
-viewer.camera = new Cesium.Camera(viewer.scene);
-
 // Module for loading and working with eclipses from local storage
 var eclipses = {
 
@@ -246,7 +243,7 @@ var eclipses = {
         var eclipse = this.events[iso];
         var czml_path = eclipse.czml_path;
         var czmlDataSource = new Cesium.CzmlDataSource();
-        czmlDataSource.loadUrl(czml_path);
+        czmlDataSource.load(czml_path);
         viewer.dataSources.add(czmlDataSource);
         viewer.camera.flyTo({
             destination : Cesium.Cartesian3.fromDegrees(eclipse.json.camera_position[0],
