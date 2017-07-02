@@ -34,7 +34,7 @@ var eclipses = {
 
     isos: new Array(),
     events: new Object(),
-    current_event_idx: -1,
+    selected_iso: null,
 
     // Thanks for making me define this for you, Javascript. =/
     formatDate: function(date) {
@@ -116,13 +116,13 @@ var eclipses = {
         }
         if (all_loaded){
             // Render eclipse navigation
-            this.nav();
+            this.renderNav();
             // Render the most current event
 
             // Render a valid hash or the most current event
             var target_iso = eclipses.hash();
             if (!target_iso){ target_iso = eclipses.current(); }
-            this.render(target_iso);
+            this.renderEclipse(target_iso);
         }
     },
 
@@ -179,12 +179,12 @@ var eclipses = {
                 });
 
                 // Render eclipse navigation
-                eclipses.nav();
+                eclipses.renderNav();
 
                 // Render a valid hash or the most current event
                 var target_iso = eclipses.hash();
                 if (!target_iso){ target_iso = eclipses.current(); }
-                eclipses.render(target_iso);
+                eclipses.renderEclipse(target_iso);
             
             }).catch(function(err) {
                 console.log(err);
@@ -220,21 +220,19 @@ var eclipses = {
         return null;
     },
 
-    render: function(iso){
+    renderEclipse: function(iso){
 
-        var new_event_index = this.isos.indexOf(iso);
-        if (new_event_index == -1){
-            console.log('Unable to render iso: ' + iso);
+        if (!this.events[iso]){
+            console.error('Unable to render iso: ' + iso);
             return false;
         }
-        if (new_event_index == this.current_event_idx){
+        if (this.selected_iso == iso){
             return false;
         }
 
         // Visually deselect/dehighlight everything
-        if (this.current_event_idx != -1){
-            var current_iso = this.isos[this.current_event_idx];
-            document.getElementById("tr-"+current_iso).className = "eclipse";
+        if (iso){
+            document.getElementById("tr-"+iso).className = "eclipse";
             document.getElementById("now_showing").innerHTML = "<h4>Loading...</h4>";
         }
         viewer.dataSources.removeAll(true);
@@ -266,7 +264,7 @@ var eclipses = {
         // Visually select/highlight everything
         document.getElementById("now_showing").innerHTML = html;
         document.getElementById("tr-"+iso).className = "warning";
-        this.current_event_idx = new_event_index;
+        this.selected_iso = iso;
 
         // Write the hash to the document's location
         document.location.hash = "#" + iso;
@@ -277,26 +275,25 @@ var eclipses = {
         return true;
     },
 
-    nav: function(){
+    renderNav: function(){
         var html = '<table class="table table-striped table-hover">';
-        for (var e = 0; e < this.isos.length; e++){
-            var iso = this.isos[e];
+        this.isos.forEach(function(iso){
             var eclipse = this.events[iso];
             if (eclipse == undefined || eclipse.json.type == undefined){
-                continue;
+                return;
             }
             var date = this.formatDate(eclipse.date);
             var type = eclipse.json.type.ucwords();
             var tr_class = 'eclipse';
-            var tr_onclick = 'eclipses.render(\'' + iso + '\');';
-            if (e == this.current_event_idx){
+            var tr_onclick = 'eclipses.renderEclipse(\'' + iso + '\');';
+            if (iso == this.selected_iso){
                 tr_class = 'warning';
             }
             html += '<tr id="tr-' + iso + '" class="' + tr_class + '" onclick="' + tr_onclick + '" >'
                  +  '<td><b>' + date + '</b><br><div class="label label-primary"><span class="icon-type"></span> ' + type + '</div></td>'
                  +  '<td><small>' + eclipse.region_string + '</small></td>'
                  +  '</tr>';
-        }
+        }.bind(this));
         html += '</table>';
         document.getElementById("other_eclipses").innerHTML = html;
     }
