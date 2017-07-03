@@ -71,6 +71,23 @@ tr.eclipse {
   cursor: pointer;
 }
 
+tr.decade { 
+  cursor: pointer;
+  font-size: 130%;
+  font-weight: bold;
+  text-align: center;
+  border-top: 2px solid #a8a8a8;
+}
+
+tr.decade.collapsed {
+  color: #a8a8a8;
+}
+
+tr.decade.expanded td span:before { content: "▲"; padding-right: 15px; }
+tr.decade.expanded td span:after { content: "▲"; padding-left: 15px; }
+tr.decade.collapsed td span:before { content: "▼"; padding-right: 15px; }
+tr.decade.collapsed td span:after { content: "▼"; padding-left: 15px; }
+
 @font-face {
 	font-family: 'icomoon';
 	src:url('fonts/icomoon.eot?jydsb7');

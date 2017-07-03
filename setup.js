@@ -115,13 +115,12 @@ var eclipses = {
             }
         }
         if (all_loaded){
-            // Render eclipse navigation
-            this.renderNav();
-            // Render the most current event
-
-            // Render a valid hash or the most current event
+            // Determine the target to load first (hash or the next occurring event)
             var target_iso = eclipses.hash();
             if (!target_iso){ target_iso = eclipses.current(); }
+            // Render eclipse navigation
+            this.renderNav(target_iso);
+            // Render the most current event
             this.renderEclipse(target_iso);
         }
     },
@@ -178,14 +177,16 @@ var eclipses = {
                     eclipses.events[iso].region_string = eclipses.formatRegionString(eclipses.events[iso].json.regions);
                 });
 
-                // Render eclipse navigation
-                eclipses.renderNav();
-
-                // Render a valid hash or the most current event
+                // Determine the target to load first (hash or the next occurring event)
                 var target_iso = eclipses.hash();
                 if (!target_iso){ target_iso = eclipses.current(); }
+                
+                // Render eclipse navigation
+                eclipses.renderNav(target_iso);
+                
+                // Render the most current event
                 eclipses.renderEclipse(target_iso);
-            
+                
             }).catch(function(err) {
                 console.log(err);
             });
@@ -232,7 +233,10 @@ var eclipses = {
 
         // Visually deselect/dehighlight everything
         if (iso){
-            document.getElementById("tr-"+iso).className = "eclipse";
+            var qs = document.querySelectorAll("tr.warning");
+            for (var row in qs) if (qs.hasOwnProperty(row)) {
+                qs[row].className = "eclipse";
+            }
             document.getElementById("now_showing").innerHTML = "<h4>Loading...</h4>";
         }
         viewer.dataSources.removeAll(true);
@@ -275,13 +279,33 @@ var eclipses = {
         return true;
     },
 
-    renderNav: function(){
+    renderNav: function(target_iso){
+
+        var leave_expanded = parseInt(new Date().toISOString().substr(0,3)) * 10; // Curent decade
+        if (typeof target_iso != "undefined"){ leave_expanded = parseInt(target_iso.substr(0,3)) * 10; }
+        var collapse_decades = {};
+        collapse_decades[leave_expanded] = false;
+
         var html = '<table class="table table-striped table-hover">';
+        var rendering_decade = null;
         this.isos.forEach(function(iso){
             var eclipse = this.events[iso];
             if (eclipse == undefined || eclipse.json.type == undefined){
                 return;
             }
+
+            // Resolve decade and render decade header if necessary
+            var event_decade = parseInt(iso.substr(0,3)) * 10;
+            collapse_decades[event_decade] = (collapse_decades[event_decade] === false ? false : true);
+            if (event_decade != rendering_decade){
+                var event_decade_title = event_decade + " - " + (event_decade + 9);
+                rendering_decade = event_decade;
+                html += '<tr id="tr-decade-' + event_decade + '" class="active decade expanded" onclick="eclipses.toggleDecade(\'' + event_decade + '\')">'
+                     +  '<td colspan="2"><span>' + event_decade_title + '</span></td>'
+                     +  '</tr>';
+            }            
+
+            // Format and render event row
             var date = this.formatDate(eclipse.date);
             var type = eclipse.json.type.ucwords();
             var tr_class = 'eclipse';
@@ -289,13 +313,36 @@ var eclipses = {
             if (iso == this.selected_iso){
                 tr_class = 'warning';
             }
-            html += '<tr id="tr-' + iso + '" class="' + tr_class + '" onclick="' + tr_onclick + '" >'
+            html += '<tr id="tr-' + iso + '" class="' + tr_class + '" data-decade="' + event_decade + '" onclick="' + tr_onclick + '" >'
                  +  '<td><b>' + date + '</b><br><div class="label label-primary"><span class="icon-type"></span> ' + type + '</div></td>'
                  +  '<td><small>' + eclipse.region_string + '</small></td>'
                  +  '</tr>';
         }.bind(this));
         html += '</table>';
         document.getElementById("other_eclipses").innerHTML = html;
+
+        for (var decade in collapse_decades){
+            if (collapse_decades[decade]){ this.toggleDecade(decade); }
+        }
+    },
+
+    toggleDecade: function(decade){
+        if (!decade){ return null; }
+        var header = document.getElementById("tr-decade-" + decade);
+        if (!header){ return null; }
+        var status = header.className.indexOf("expanded") == -1 ? "collapsed" : "expanded";
+        var qs = document.querySelectorAll("[data-decade='" + decade + "']");
+        if (status == "expanded"){
+            header.className = "active decade collapsed";
+            for (var row in qs) if (qs.hasOwnProperty(row)) {
+                qs[row].style.display = "none";
+            }
+        } else {
+            header.className = "active decade expanded";
+            for (var row in qs) if (qs.hasOwnProperty(row)) {
+                qs[row].style.display = "table-row";
+            }
+        }
     }
     
 };
