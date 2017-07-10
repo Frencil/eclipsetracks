@@ -5,13 +5,32 @@ html, body {
 .nav_block { 
   display: block;
   width: 100%;
+  padding: 0px;
+  margin: 0px;
+}
+
+.info_block { 
+  display: block;
+  width: 100%;
   padding: 8px 8px 0px 8px;
-  margin-top: 0px;
-  margin-bottom: 0px;
+  margin: 0px;
 }
 
 .nav_block h2 { margin-top: 6px; }
-.nav_block h3 { margin-top: 0px; }
+.nav_block h3 {
+  margin: 0px;
+  padding: 7px;
+  font-size: 18px;
+  height: 34px;
+  text-align: center;
+  background-color: #111;
+  color: #a3a3a3;
+}
+
+.info_block h4 {
+  margin-top: 7px;
+  margin-bottom: 7px;
+}
 
 #nav_title { 
   height: 85px;
@@ -26,8 +45,12 @@ html, body {
 
 #nav_other { 
   height: calc(100% - 85px - 190px - 120px);
-  overflow-y: auto; overflow-x: hidden;
   border-bottom: 1px solid #111;
+}
+
+#other_eclipses {
+  height:calc(100% - 34px);
+  overflow-y: auto; overflow-x: hidden;
 }
 
 #nav_credits { 

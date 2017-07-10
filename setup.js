@@ -260,14 +260,14 @@ var eclipses = {
         var type = eclipse.json.type.ucwords();
         var date = this.formatDate(eclipse.date);
         var html = '<div class="row">'
-                 + '<div class="col-xs-5"><h4><div class="label label-danger"><span class="icon-date"></span> Date</div></h4></div>'
-                 + '<div class="col-xs-7"><h4><b>' + date + '</b></h4></div>'
+                 + '<div class="col-xs-4"><h4><div class="label label-danger"><span class="icon-date"></span> Date</div></h4></div>'
+                 + '<div class="col-xs-8"><h4><b>' + date + '</b></h4></div>'
                  + '</div><div class="row">'
-                 + '<div class="col-xs-5"><h4><div class="label label-success"><span class="icon-type"></span> Eclipse Type</div></div>'
-                 + '<div class="col-xs-7"><h4>' + type + '</h4></div>'
+                 + '<div class="col-xs-4"><h4><div class="label label-success"><span class="icon-type"></span> Type</div></div>'
+                 + '<div class="col-xs-8"><h4>' + type + '</h4></div>'
                  + '</div><div class="row">'
-                 + '<div class="col-xs-5"><h4><div class="label label-info"><span class="icon-regions"></span> Regions</div></div>'
-                 + '<div class="col-xs-7">' + eclipse.region_string + '</div>'
+                 + '<div class="col-xs-4"><h4><div class="label label-info"><span class="icon-regions"></span> Regions</div></div>'
+                 + '<div class="col-xs-8" style="font-size: 13px;">' + eclipse.region_string + '</div>'
                  + '</div>';
 
         // Visually select/highlight everything
@@ -338,7 +338,7 @@ var eclipses = {
             return false;
         }
         var row = document.getElementById("tr-" + iso);
-        var nav = document.getElementById("nav_other");
+        var nav = document.getElementById("other_eclipses");
         nav.scrollTop = (row.offsetTop + row.offsetHeight) - Math.round(nav.clientHeight / 2);
     },
 
