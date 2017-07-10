@@ -120,6 +120,8 @@ var eclipses = {
             if (!target_iso){ target_iso = eclipses.current(); }
             // Render eclipse navigation
             this.renderNav(target_iso);
+            // Scroll the nav to the current event
+            this.navCenterScroll(target_iso);
             // Render the most current event
             this.renderEclipse(target_iso);
         }
@@ -183,6 +185,9 @@ var eclipses = {
                 
                 // Render eclipse navigation
                 eclipses.renderNav(target_iso);
+
+                // Scroll the nav to the current event
+                eclipses.navCenterScroll(target_iso);
                 
                 // Render the most current event
                 eclipses.renderEclipse(target_iso);
@@ -321,9 +326,20 @@ var eclipses = {
         html += '</table>';
         document.getElementById("other_eclipses").innerHTML = html;
 
+        // Collapse all the decades that should be collapsed
         for (var decade in collapse_decades){
             if (collapse_decades[decade]){ this.toggleDecade(decade); }
         }
+
+    },
+
+    navCenterScroll: function(iso){
+        if (!this.events[iso]){
+            return false;
+        }
+        var row = document.getElementById("tr-" + iso);
+        var nav = document.getElementById("nav_other");
+        nav.scrollTop = (row.offsetTop + row.offsetHeight) - Math.round(nav.clientHeight / 2);
     },
 
     toggleDecade: function(decade){
