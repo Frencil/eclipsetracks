@@ -51,7 +51,7 @@ var eclipses = {
                 if (r > 0 && regions.length > 2){
                     region_string += ", ";
                 }
-                if (r == regions.length - 1){
+                if ((r == regions.length - 1) && (regions.length > 1)){
                     region_string += " and ";
                 }
                 region_string += regions[r].ucwords();
