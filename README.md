@@ -6,7 +6,7 @@ This repository is the source code for [EclipseTracks.org](http://eclipsetracks.
 
 ## Composition
 
-[Cesium](https://github.com/AnalyticalGraphicsInc/cesium) powers the application and is loaded viaa CDN links.
+[Cesium](https://github.com/AnalyticalGraphicsInc/cesium) powers the application and is loaded via CDN links.
 
 In the `czml` directory are generated CZML and JSON files for all eclipse events described (by ISO data and link to tabular data) in `czml/events.txt`. The python script `scraper/scraper.py` transforms [NASA eclipse data](https://eclipse.gsfc.nasa.gov/solar.html) into usable CZML files depicting tracks and shadows. Run from the scraper directory like so:
 
