@@ -8,7 +8,7 @@ if (typeof Promise !== "undefined" && Promise.toString().indexOf("[native code]"
 var json_reqs = [];
 
 // Define API key
-Cesium.BingMapsApi.defaultKey = "AmsUN3rpnZqwZnpvigSSuP0Xox53w8lgonqh8pORPGtD5R1qMrwnzotPwzr5eUVq";
+Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZTg5YWQ4MC1lYjRiLTQ5MTItODZmYS01MTUzMzI0ODc5NDMiLCJpZCI6MTkzNTA3LCJpYXQiOjE3MDY4NDk3MzR9.TRMsdXhzoDwuo6OGLTF0JdJA0aOePU52H-mKy0ZgihI";
 
 // Handy function to capitalize words in strings
 String.prototype.ucwords = function(){
@@ -22,9 +22,14 @@ var defaultImageryProviderViewModel = availableBaseLayers[1];
 
 // Top-level var for working with the Cesium viewer
 var viewer = new Cesium.Viewer('cesiumContainer', {
+    // terrain: Cesium.Terrain.fromWorldTerrain(),
 	imageryProviderViewModels: availableBaseLayers,
 	selectedImageryProviderViewModel: defaultImageryProviderViewModel
 });
+
+// Add Cesium OSM Buildings, a global 3D buildings layer.
+//const buildingTileset = await Cesium.createOsmBuildingsAsync();
+//viewer.scene.primitives.add(buildingTileset);   
 
 // Turn on day/night lighting
 viewer.scene.globe.enableLighting = true;
@@ -280,6 +285,9 @@ var eclipses = {
 
         // Log the event in Piwik
         _paq.push(['trackPageView', '[Eclipse ISO] ' + iso]);
+
+        // Start the clock
+        viewer.clock.shouldAnimate = true;
 
         return true;
     },
