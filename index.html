@@ -7,12 +7,14 @@
   <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
   <!-- Make the application on mobile take up the full browser screen and disable user scaling. -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
-  <meta name="author" content="Christopher Clark">
+  <meta name="author" content="Christoph Clark">
   <meta name="description" content="Open source WebGL-powered interactive 3D visualization of solar eclipse events around the planet">
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <title>Eclipsetracks.org - Interactive Solar Eclipses with CesiumJS</title>
-  <script src="Cesium/Cesium.js"></script>
-  <link rel="stylesheet" href="Cesium/Widgets/widgets.css">
+  <!-- Include the CesiumJS JavaScript and CSS files -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <!-- Remaining stylesheets -->
   <link rel="stylesheet" href="//frencil.github.io/eclipsetracks/bootstrap.min.css?t=1474824789">
   <!-- link rel="stylesheet" href="bootstrap.min.css?t=1474824788" -->
   <link rel="stylesheet" href="main.css?t=1474824788">
@@ -53,7 +55,7 @@
       <div class="info_block">
         <p class="text-muted">
           &copy; 2016 <a href="">EclipseTracks.org</a><br>
-          Built and maintained by: <a href="https://github.com/Frencil" target="_new">Christopher Clark (Frencil)</a><br>
+          Built and maintained by: <a href="https://github.com/Frencil" target="_new">Christoph Clark (Frencil)</a><br>
           Source code: <a href="https://github.com/Frencil/eclipsetracks" target="_new">https://github.com/Frencil/eclipsetracks</a><br>
           Eclipse predictions by: <a href="http://eclipse.gsfc.nasa.gov/solar.html" target="_new">Fred Espenak, NASA's GSFC</a><br>
           More eclipse maps: <a href="http://www.greatamericaneclipse.com/" target="_new">www.greatamericaneclipse.com</a>
