@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "eclipsescraper"
+version = "0.5.0"
+description = ""
+authors = ["Christoph Clark <frencils@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+czml3 = "^0.7.0"
+geopy = "^2.4.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

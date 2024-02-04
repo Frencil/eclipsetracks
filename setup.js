@@ -22,7 +22,7 @@ var defaultImageryProviderViewModel = availableBaseLayers[1];
 
 // Top-level var for working with the Cesium viewer
 var viewer = new Cesium.Viewer('cesiumContainer', {
-    // terrain: Cesium.Terrain.fromWorldTerrain(),
+    terrain: Cesium.Terrain.fromWorldTerrain(),
 	imageryProviderViewModels: availableBaseLayers,
 	selectedImageryProviderViewModel: defaultImageryProviderViewModel
 });

@@ -4,20 +4,30 @@
 # http://eclipse.gsfc.nasa.gov/eclipse.html
 # Eclipse Predictions by Fred Espenak, NASA's GSFC
 
-import re, sys, math, json, csv, datetime, traceback
-from geopy.distance import vincenty
+import re, math, json, csv, datetime, traceback
+from geopy.distance import geodesic
 
-from lxml import html
+import urllib.request
 
-if sys.version[0] is '3':
-    import urllib.request
-elif sys.version[0] is '2':
-    import requests
+from czml3 import Document, Packet, Preamble
 
-try:
-    from czml import czml
-except ImportError:
-    import czml
+from czml3.properties import (
+    Clock,
+    Color,
+    Ellipse,
+    Material,
+    Polygon,
+    Polyline,
+    PositionList,
+    SolidColorMaterial,
+)
+
+from czml3.types import IntervalValue
+
+VERSION="1.1"
+
+def addition(a, b):  
+    return a + b  
 
 class EclipseTrack:
 
@@ -59,16 +69,11 @@ class EclipseTrack:
         elif total:
             self.type = 'total'
 
-        if sys.version[0] is '3':
-            r = urllib.request.urlopen(self.url)
-            if r.status != 200:
-                raise Exception('Unable to load eclipse event: ' + iso + ' (URL: ' + self.url + ')')
-            else:
-                html = r.read().decode('utf-8','ignore')
-
-        elif sys.version[0] is '2':
-            page = requests.get(url)
-            html = page.text.encode('ascii','ignore')
+        r = urllib.request.urlopen(self.url)
+        if r.status != 200:
+            raise Exception('Unable to load eclipse event: ' + iso + ' (URL: ' + self.url + ')')
+        else:
+            html = r.read().decode('utf-8','ignore')
         
         self.loadFromRawHTML(html)
 
@@ -309,12 +314,34 @@ class EclipseTrack:
                }
         return obj
 
-    # Generate a valid CZML object using all available data
+    # Generate a CZML document for rendering ONLY this track
     def czml(self):
 
-        doc = czml.CZML();
         iso = self.date.isoformat()
 
+        # Initialize document with clock
+        start = iso + "T" + self.time[0] + ":00Z"
+        end = iso + "T" + self.time[-1] + ":00Z"
+
+        doc = [];
+        doc.append(
+            Preamble(
+                version=VERSION,
+                name="EclipseTracks.org %s" % (iso),
+                clock=IntervalValue(
+                    start=start,
+                    end=end,
+                    value=Clock(
+                        currentTime=start,
+                        multiplier=300,
+                        range="LOOP_STOP",
+                        step="SYSTEM_CLOCK_MULTIPLIER"
+                    )
+                )
+            )
+        )
+
+        # TODO: Extract as function
         # Generate time-specific lists for various objects
         central_polyline_degrees = []
         north_polyline_degrees = []
@@ -351,10 +378,10 @@ class EclipseTrack:
             else:
                 south = self.position['south'][t]
 
-            # Approximate ellipse semiMajorAxis from vincenty distance between limit polylines
+            # Approximate ellipse semiMajorAxis from geodesic distance between limit polylines
             north2 = (north[1], north[0])
             south2 = (south[1], south[0])
-            semi_major_axis = vincenty(north2, south2).meters / 2
+            semi_major_axis = geodesic(north2, south2).meters / 2
 
             # Approximate elipse semiMinorAxis from sun altitude (probably way wrong!)
             ellipse_axis_ratio = self.sun_altitude[t] / 90
@@ -386,74 +413,104 @@ class EclipseTrack:
             ellipse_position += [time, central[0], central[1], 0.0]
             ellipse_semiMajorAxis += [time, round(semi_major_axis, 3)]
             ellipse_semiMinorAxis += [time, round(semi_minor_axis, 3)]
-            ellipse_rotation += [time, round(rotation, 3)]        
+            ellipse_rotation += [time, round(rotation, 3)]
 
-        # Generate document packet with clock
-        start_time = iso + "T" + self.time[0] + ":00Z"
-        end_time = iso + "T" + self.time[-1] + ":00Z"
-        packet = czml.CZMLPacket(id='document',version='1.0')
-        c = czml.Clock()
-        c.multiplier = 300
-        c.range = "LOOP_STOP"
-        c.step = "SYSTEM_CLOCK_MULTIPLIER"
-        c.currentTime = start_time
-        c.interval = start_time + "/" + end_time
-        packet.clock = c
-        doc.packets.append(packet)
 
-        # Generate a polyline packet for the north and south polylines, connected and filled
-        limit_polyline_degrees = list(north_polyline_degrees)
-        point = len(south_polyline_degrees)/3
+        # Generate a list of positions representing the track as an enclosed polygon
+        track_polygon_positions = list(north_polyline_degrees)
+        point = round(len(south_polyline_degrees)/3)
         while (point > 0):
             offset = (point-1) * 3
-            limit_polyline_degrees += [ south_polyline_degrees[offset],
-                                        south_polyline_degrees[offset+1],
-                                        south_polyline_degrees[offset+2] ]
+            track_polygon_positions += [
+                south_polyline_degrees[offset],
+                south_polyline_degrees[offset+1],
+                south_polyline_degrees[offset+2],
+            ]
             point -= 1
-        packet_id = iso + '_bounds_polygon'
-        packet = czml.CZMLPacket(id=packet_id)
-        boc = czml.Color(rgba=(232, 72, 68, 255))
-        bsc = czml.SolidColor(color=czml.Color(rgba=(0, 0, 0, 66)))
-        bmat = czml.Material(solidColor=bsc)
-        bdeg = limit_polyline_degrees
-        bpos = czml.Positions(cartographicDegrees=bdeg)
-        bpg = czml.Polygon(show=True, height=0, outline=True, outlineColor=boc, outlineWidth=2, material=bmat, positions=bpos)
-        packet.polygon = bpg
-        doc.packets.append(packet)
 
-        # Generate central polyline packet
-        packet_id = iso + '_central_polyline'
-        packet = czml.CZMLPacket(id=packet_id)
-        csc = czml.SolidColor(color=czml.Color(rgba=(241, 226, 57, 255)))
-        cmat = czml.Material(solidColor=csc)
-        cpos = czml.Positions(cartographicDegrees=central_polyline_degrees)
-        cpl = czml.Polyline(show=True, width=4, followSurface=True, material=cmat, positions=cpos)
-        packet.polyline = cpl
-        doc.packets.append(packet)
+        # Render track as polygon fill with polylines for north, central, and south
+        doc.append(
+            Packet(
+                id="track_length_fill_%s" % (iso),
+                polygon=Polygon(
+                    show=True,
+                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(0, 0, 0, 90)))),
+                    positions=PositionList(cartographicDegrees=track_polygon_positions),
+                )
+            )
+        )
+        doc.append(
+            Packet(
+                id="track_north_line_%s" % (iso),
+                polyline=Polyline(
+                    show=True,
+                    clampToGround=True,
+                    width=2,
+                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(232, 72, 68, 255)))),
+                    positions=PositionList(cartographicDegrees=north_polyline_degrees),
+                )
+            )
+        )
+        doc.append(
+            Packet(
+                id="track_central_line_%s" % (iso),
+                polyline=Polyline(
+                    show=True,
+                    clampToGround=True,
+                    width=2,
+                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(241, 226, 57, 255)))),
+                    positions=PositionList(cartographicDegrees=central_polyline_degrees),
+                )
+            )
+        )
+        doc.append(
+            Packet(
+                id="track_south_line_%s" % (iso),
+                polyline=Polyline(
+                    show=True,
+                    clampToGround=True,
+                    width=2,
+                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(232, 72, 68, 255)))),
+                    positions=PositionList(cartographicDegrees=south_polyline_degrees),
+                )
+            )
+        )
 
-        # Generate ellipse shadow packet
-        packet_id = iso + '_shadow_ellipse'
-        packet = czml.CZMLPacket(id=packet_id)
-        esc = czml.SolidColor(color=czml.Color(rgba=(0, 0, 0, 160)))
-        emat = czml.Material(solidColor=esc)
-        xmaj = czml.Number(ellipse_semiMajorAxis)
-        xmin = czml.Number(ellipse_semiMinorAxis)
-        rot = czml.Number(ellipse_rotation)
-        ell = czml.Ellipse(show=True, fill=True, granularity=0.002, material=emat, semiMajorAxis=xmaj, semiMinorAxis=xmin, rotation=rot)
-        packet.ellipse = ell
-        packet.position = czml.Position(cartographicDegrees=ellipse_position)
-        doc.packets.append(packet)
+        # Render approximated umbral shadow as a moving ellipse
+        doc.append(
+            Packet(
+                id="approximated_umbral_shadow_%s" % (iso),
+                position=PositionList(cartographicDegrees=ellipse_position),
+                ellipse=Ellipse(
+                    show=True,
+                    fill=True,
+                    granularity=0.002,
+                    semiMajorAxis={ "number": ellipse_semiMajorAxis },
+                    semiMinorAxis={ "number": ellipse_semiMinorAxis },
+                    rotation={ "number": ellipse_rotation },
+                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(0, 0, 0, 160)))),
+                )
+            )
+        )
 
-        return list(doc.data())
+        # Done!
+        return Document(doc)
+
 
 # If called from command line then parse events.txt and scrape/generate CZML and JSON files
 if __name__ == "__main__":
 
-    czml_path = "../czml/"
+    czml_path = "../../czml/"
+    # LIMIT = 3
+    # INC = 0
     with open(czml_path + "events.txt", "r") as events:
 
         reader = csv.reader(events, delimiter=',')
         for row in reader:
+
+            # INC += 1
+            # if INC > LIMIT or INC < 3:
+            #     continue
 
             iso = row[0]
             url = row[1]
@@ -468,7 +525,7 @@ if __name__ == "__main__":
                 track_czml = track.czml()
                 czml_filename = czml_path + iso2 + ".czml"
                 with open(czml_filename, 'w') as outfile:
-                    json.dump(track_czml, outfile)
+                    track_czml.dump(outfile)
                     print("Wrote " + czml_filename)
 
                     track_json = track.json()

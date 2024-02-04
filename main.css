@@ -44,7 +44,7 @@ html, body {
 }
 
 #nav_other { 
-  height: calc(100% - 85px - 190px - 120px);
+  height: calc(100% - 85px - 190px - 105px);
   border-bottom: 1px solid #111;
 }
 
@@ -55,7 +55,7 @@ html, body {
 
 #nav_credits { 
   font-size: 80%;
-  height: 120px;
+  height: 105px;
 }
 
 @media (max-width: 639px) {

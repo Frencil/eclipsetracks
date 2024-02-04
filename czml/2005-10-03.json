@@ -1,1 +1,1 @@
-{"regions": ["europe", "indian ocean", "north atlantic", "northern africa", "southern africa"], "type": "annular", "iso": "2005-10-03", "camera_position": [28.795, 12.817, 10000000.0]}
+{"iso": "2005-10-03", "type": "annular", "camera_position": [28.795, 12.817, 10000000.0], "regions": ["europe", "indian ocean", "north atlantic", "northern africa", "southern africa"]}
