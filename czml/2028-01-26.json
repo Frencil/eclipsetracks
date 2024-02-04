@@ -1,1 +1,1 @@
-{"regions": ["europe", "north atlantic", "northern africa", "south america", "south pacific"], "type": "annular", "iso": "2028-01-26", "camera_position": [-51.517, 2.995, 10000000.0]}
+{"iso": "2028-01-26", "type": "annular", "camera_position": [-51.517, 2.995, 10000000.0], "regions": ["europe", "north atlantic", "northern africa", "south america", "south pacific"]}

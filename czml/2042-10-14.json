@@ -1,1 +1,1 @@
-{"regions": ["australia / new zealand", "indian ocean", "south pacific", "southeastern asia"], "type": "annular", "iso": "2042-10-14", "camera_position": [137.972, -23.927, 10000000.0]}
+{"iso": "2042-10-14", "type": "annular", "camera_position": [137.972, -23.927, 10000000.0], "regions": ["australia / new zealand", "indian ocean", "south pacific", "southeastern asia"]}

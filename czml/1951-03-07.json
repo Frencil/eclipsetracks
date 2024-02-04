@@ -1,1 +1,1 @@
-{"regions": ["australia / new zealand", "central america", "south pacific"], "type": "annular", "iso": "1951-03-07", "camera_position": [-123.345, -17.47, 10000000.0]}
+{"iso": "1951-03-07", "type": "annular", "camera_position": [-123.345, -17.47, 10000000.0], "regions": ["australia / new zealand", "central america", "south pacific"]}

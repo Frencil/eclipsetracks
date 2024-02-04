@@ -1,1 +1,1 @@
-{"regions": ["indian ocean", "south atlantic", "southeastern asia"], "type": "annular", "iso": "2009-01-26", "camera_position": [70.625, -33.813, 10000000.0]}
+{"iso": "2009-01-26", "type": "annular", "camera_position": [70.625, -33.813, 10000000.0], "regions": ["indian ocean", "south atlantic", "southeastern asia"]}

@@ -1,1 +1,1 @@
-{"regions": ["south america", "south atlantic", "south pacific"], "type": "annular", "iso": "1952-08-20", "camera_position": [-64.085, -21.682, 10000000.0]}
+{"iso": "1952-08-20", "type": "annular", "camera_position": [-64.085, -21.682, 10000000.0], "regions": ["south america", "south atlantic", "south pacific"]}

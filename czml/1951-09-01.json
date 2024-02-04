@@ -1,1 +1,1 @@
-{"regions": ["north america", "north atlantic", "northern africa", "south atlantic", "southern africa"], "type": "annular", "iso": "1951-09-01", "camera_position": [-8.34, 16.323, 10000000.0]}
+{"iso": "1951-09-01", "type": "annular", "camera_position": [-8.34, 16.323, 10000000.0], "regions": ["north america", "north atlantic", "northern africa", "south atlantic", "southern africa"]}

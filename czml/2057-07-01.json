@@ -1,1 +1,1 @@
-{"regions": ["arctic", "north america", "northern asia"], "type": "annular", "iso": "2057-07-01", "camera_position": [-175.503, 71.508, 10000000.0]}
+{"iso": "2057-07-01", "type": "annular", "camera_position": [-175.503, 71.508, 10000000.0], "regions": ["arctic", "north america", "northern asia"]}
