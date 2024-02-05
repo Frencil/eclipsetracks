@@ -293,6 +293,8 @@ var eclipses = {
                         eclipse.camera_position[2]
                     )
                 });
+                // Start the clock when flying to a new event
+                viewer.clock.shouldAnimate = true;
             }
         });
         viewer.dataSources.add(czmlDataSource);
@@ -322,9 +324,6 @@ var eclipses = {
 
         // Log the event in Piwik
         _paq.push(['trackPageView', '[Eclipse ISO] ' + iso]);
-
-        // Start the clock
-        viewer.clock.shouldAnimate = true;
 
         return true;
     },
