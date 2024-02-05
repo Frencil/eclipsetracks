@@ -279,22 +279,23 @@ var eclipses = {
         // Load CZML into the viewer and set viewer camera/clock from hash if necessary
         var czml_path = eclipse.czml_path;
         var czmlDataSource = new Cesium.CzmlDataSource();
-        czmlDataSource.load(czml_path);
+        czmlDataSource.load(czml_path).then(function() {
+            var shouldFlyTo = true;
+            if (!hasTriedToLoadUrlHash) {
+                hashToViewer();
+                if (urlLoadHashSucceeded) { shouldFlyTo = false; }
+            }
+            if (shouldFlyTo) {
+                viewer.camera.flyTo({
+                    destination: Cesium.Cartesian3.fromDegrees(
+                        eclipse.camera_position[0],
+                        eclipse.camera_position[1],
+                        eclipse.camera_position[2]
+                    )
+                });
+            }
+        });
         viewer.dataSources.add(czmlDataSource);
-        var shouldFlyTo = true;
-        if (!hasTriedToLoadUrlHash) {
-            hashToViewer();
-            if (urlLoadHashSucceeded) { shouldFlyTo = false; }
-        }
-        if (shouldFlyTo) {
-            viewer.camera.flyTo({
-                destination: Cesium.Cartesian3.fromDegrees(
-                    eclipse.camera_position[0],
-                    eclipse.camera_position[1],
-                    eclipse.camera_position[2]
-                )
-            });
-        }
 
         // Visually select/highlight everything
         var type = eclipse.type.ucwords();
