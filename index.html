@@ -10,7 +10,9 @@
   <meta name="author" content="Christoph Clark">
   <meta name="description" content="Open source WebGL-powered interactive 3D visualization of solar eclipse events around the planet">
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
-  <title>Eclipsetracks.org - Interactive Solar Eclipses with CesiumJS</title>
+  <title>Eclipsetracks.org | Interactive Solar Eclipses with CesiumJS</title>
+  <!-- lz-string is used for compressing camera/clock state for url caching -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
   <!-- Include the CesiumJS JavaScript and CSS files -->
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
@@ -56,8 +58,8 @@
         <p class="text-muted">
           &copy; 2024 <a href="">EclipseTracks.org</a><br>
           Built and maintained by: <a href="https://github.com/Frencil" target="_new">Christoph Clark (Frencil)</a><br>
-          Source code: <a href="https://github.com/Frencil/eclipsetracks" target="_new">https://github.com/Frencil/eclipsetracks</a><br>
-          Eclipse predictions by: <a href="http://eclipse.gsfc.nasa.gov/solar.html" target="_new">Fred Espenak, NASA's GSFC</a><br>
+          Source code: <a href="https://github.com/Frencil/eclipsetracks" target="_new">github.com/Frencil/eclipsetracks</a><br>
+          Base data from: <a href="http://eclipse.gsfc.nasa.gov/solar.html" target="_new">Fred Espenak, NASA's GSFC</a><br>
         </p>
         <p class="text-warning">Umbral shadows are approximations only! <a href="http://squiggle.city/~frencil/archives/20150317.html" target="_new">Details here.</a></p>
       </div>
@@ -69,7 +71,7 @@
   <div id="cesiumContainer"></div>
 
   <!-- Load primary application JavaScript and data -->
-  <script language="JavaScript" src="setup.js?t=1474824789"></script>
+  <script language="JavaScript" src="setup.js?t=1474824790"></script>
   <iframe id="czml_events" src="czml/events.txt" onload="eclipses.loadEvents();" style="display: none;"></iframe>
 
   <!-- Piwik -->
