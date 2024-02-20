@@ -13,7 +13,7 @@ poetry install --with dev
 
 ## Run the Scraper
 
-From `~/eclipsescraper`:
+From `~/eclipsescraper/src`:
 
 ```
 python eclipsescraper.py
