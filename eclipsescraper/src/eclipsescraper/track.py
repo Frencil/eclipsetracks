@@ -1,66 +1,25 @@
-"""Scrape eclipse track data from NASA and generate EclipseTracks.org CZML/JSON.
+"""Scrape NASA eclipse path tables and render eclipse tracks as CZML.
 
 Source: https://eclipse.gsfc.nasa.gov/solar.html
 Eclipse Predictions by Fred Espenak, NASA's GSFC
 """
 
-import argparse
-import csv
 import datetime
-import hashlib
 import json
-import math
 import re
-import sys
-import time as time_module
-import traceback
-import urllib.request
-from pathlib import Path
 
 from czml3 import Document, Packet
 from czml3.properties import (
     Clock,
-    Color,
-    Ellipse,
     Material,
     Polygon,
     Polyline,
     PolylineMaterial,
-    Position,
     PositionList,
-    SolidColorMaterial,
 )
-from czml3.types import IntervalValue, NumberValue
-from geopy.distance import geodesic
+from czml3.types import IntervalValue
 
-CZML_VERSION = "1.1"
-
-# Repo layout: eclipsetracks/eclipsescraper/src/eclipsescraper.py -> eclipsetracks/czml
-DEFAULT_CZML_DIR = Path(__file__).resolve().parents[2] / "czml"
-DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[1] / ".cache"
-
-USER_AGENT = "eclipsescraper (+https://github.com/Frencil/eclipsetracks)"
-
-
-def fetch_url(url, cache_dir=None, delay=0.0):
-    """Fetch a URL as text, optionally via an on-disk cache keyed by URL."""
-    cache_file = None
-    if cache_dir is not None:
-        cache_dir = Path(cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = cache_dir / (hashlib.sha1(url.encode()).hexdigest() + ".html")
-        if cache_file.exists():
-            return cache_file.read_text(encoding="utf-8")
-    if delay:
-        time_module.sleep(delay)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        if r.status != 200:
-            raise Exception("Unable to load URL: %s (HTTP %s)" % (url, r.status))
-        text = r.read().decode("utf-8", "ignore")
-    if cache_file is not None:
-        cache_file.write_text(text, encoding="utf-8")
-    return text
+from .common import CZML_VERSION, TRACK_FILL_RGBA, TRACK_CENTRAL_RGBA, TRACK_LIMIT_RGBA, fetch_url, solid
 
 
 class EclipseTrack:
@@ -349,84 +308,32 @@ class EclipseTrack:
                }
         return obj
 
-    # Generate a CZML document for rendering ONLY this track
-    def czml(self):
+    # The UTC interval covered by the path table, as ISO 8601 strings
+    def interval(self):
+        datetimes = self.datetimes()
+        return tuple(d.strftime("%Y-%m-%dT%H:%M:%SZ") for d in (datetimes[0], datetimes[-1]))
+
+    # Generate a CZML document for rendering this track (plus any extra packets, e.g. a shadow).
+    # The clock covers the path table's times, extended to cover extra_interval (UTC datetimes)
+    # if given, e.g. the whole time the shadow is on the Earth.
+    def czml(self, extra_packets=(), extra_interval=None):
 
         iso = self.date.isoformat()
-        datetimes = self.datetimes()
-        epoch = datetimes[0]
-        seconds = [round((d - epoch).total_seconds()) for d in datetimes]
+        start, end = self.interval()
+        if extra_interval is not None:
+            fmt = "%Y-%m-%dT%H:%M:%SZ"
+            # Round outward to whole seconds; ISO strings in this format sort chronologically
+            start = min(start, extra_interval[0].replace(microsecond=0).strftime(fmt))
+            end = max(end, (extra_interval[1].replace(microsecond=0) + datetime.timedelta(seconds=1)).strftime(fmt))
 
-        def isotime(d):
-            return d.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-        start = isotime(datetimes[0])
-        end = isotime(datetimes[-1])
-
-        def solid(rgba):
-            return SolidColorMaterial(color=Color(rgba=rgba))
-
-        # Generate time-specific lists for various objects
-        central_polyline_degrees = []
+        # Polyline waypoints for the northern limit, central line, and southern limit
         north_polyline_degrees = []
+        central_polyline_degrees = []
         south_polyline_degrees = []
-        ellipse_position = []
-        ellipse_semiMajorAxis = []
-        ellipse_semiMinorAxis = []
-        ellipse_rotation = []
-
         for t in range(len(self.time)):
-
-            sec = seconds[t]
-
-            # Define polyline waypoints only where data exist
-            if self.position['north'][t] is not None:
-                north_polyline_degrees += [self.position['north'][t][0], self.position['north'][t][1], 0.0]
-            if self.position['central'][t] is not None:
-                central_polyline_degrees += [self.position['central'][t][0], self.position['central'][t][1], 0.0]
-            if self.position['south'][t] is not None:
-                south_polyline_degrees += [self.position['south'][t][0], self.position['south'][t][1], 0.0]
-
-            # Define ellipse positions and attributes for every time in the interval, using limits where necessary
-            use_limit = min(int(math.floor(t/(len(self.time)/2))),1)
-            north = self.position['north'][t] or self.limits['north'][use_limit]
-            central = self.position['central'][t] or self.limits['central'][use_limit]
-            south = self.position['south'][t] or self.limits['south'][use_limit]
-
-            # Approximate ellipse semiMajorAxis from geodesic distance between limit polylines
-            north2 = (north[1], north[0])
-            south2 = (south[1], south[0])
-            semi_major_axis = geodesic(north2, south2).meters / 2
-
-            # Approximate elipse semiMinorAxis from sun altitude (probably way wrong!)
-            ellipse_axis_ratio = self.sun_altitude[t] / 90
-            semi_minor_axis = semi_major_axis * ellipse_axis_ratio
-
-            # Approximate ellipse rotation using basic spheroid
-            # Calculate bearing in both directions and average them
-            nlat = north[1]/180 * math.pi
-            nlon = north[0]/180 * math.pi
-            slat = south[1]/180 * math.pi
-            slon = south[0]/180 * math.pi
-
-            y = math.sin(slon-nlon) * math.cos(slat)
-            x = math.cos(nlat) * math.sin(slat) - math.sin(nlat) * math.cos(slat) * math.cos(slon-nlon)
-            initial_bearing = math.atan2(y, x)
-            if (initial_bearing < 0):
-                initial_bearing += math.pi * 2
-
-            y = math.sin(nlon-slon) * math.cos(nlat)
-            x = math.cos(slat) * math.sin(nlat) - math.sin(slat) * math.cos(nlat) * math.cos(nlon-slon)
-            final_bearing = math.atan2(y, x) - math.pi
-            if (final_bearing < 0):
-                final_bearing += math.pi * 2
-
-            rotation = -1 * ((initial_bearing + final_bearing) / 2 - (math.pi / 2))
-
-            ellipse_position += [sec, central[0], central[1], 0.0]
-            ellipse_semiMajorAxis += [sec, round(semi_major_axis, 3)]
-            ellipse_semiMinorAxis += [sec, round(semi_minor_axis, 3)]
-            ellipse_rotation += [sec, round(rotation, 3)]
+            north_polyline_degrees += [self.position['north'][t][0], self.position['north'][t][1], 0.0]
+            central_polyline_degrees += [self.position['central'][t][0], self.position['central'][t][1], 0.0]
+            south_polyline_degrees += [self.position['south'][t][0], self.position['south'][t][1], 0.0]
 
         # Generate a list of positions representing the track as an enclosed polygon
         track_polygon_positions = list(north_polyline_degrees)
@@ -454,15 +361,15 @@ class EclipseTrack:
                 id="track_length_fill_%s" % (iso),
                 polygon=Polygon(
                     show=True,
-                    material=Material(solidColor=solid([0, 0, 0, 90])),
+                    material=Material(solidColor=solid(TRACK_FILL_RGBA)),
                     positions=PositionList(cartographicDegrees=track_polygon_positions),
                 ),
             ),
         ]
         for line_id, degrees, rgba in (
-            ("track_north_line", north_polyline_degrees, [232, 72, 68, 255]),
-            ("track_central_line", central_polyline_degrees, [241, 226, 57, 255]),
-            ("track_south_line", south_polyline_degrees, [232, 72, 68, 255]),
+            ("track_north_line", north_polyline_degrees, TRACK_LIMIT_RGBA),
+            ("track_central_line", central_polyline_degrees, TRACK_CENTRAL_RGBA),
+            ("track_south_line", south_polyline_degrees, TRACK_LIMIT_RGBA),
         ):
             packets.append(
                 Packet(
@@ -477,70 +384,5 @@ class EclipseTrack:
                 )
             )
 
-        # Render approximated umbral shadow as a moving ellipse
-        packets.append(
-            Packet(
-                id="approximated_umbral_shadow_%s" % (iso),
-                position=Position(epoch=start, cartographicDegrees=ellipse_position),
-                ellipse=Ellipse(
-                    show=True,
-                    fill=True,
-                    granularity=0.002,
-                    semiMajorAxis=NumberValue(epoch=start, number=ellipse_semiMajorAxis),
-                    semiMinorAxis=NumberValue(epoch=start, number=ellipse_semiMinorAxis),
-                    rotation=NumberValue(epoch=start, number=ellipse_rotation),
-                    material=Material(solidColor=solid([0, 0, 0, 160])),
-                ),
-            )
-        )
-
+        packets.extend(extra_packets)
         return Document(packets=packets)
-
-
-def read_events(events_file):
-    """Yield (iso, url, flags) for each row of events.txt."""
-    with open(events_file, newline="") as f:
-        for row in csv.reader(f):
-            if len(row) < 2 or not re.match(r"^\d{4}-\d{2}-\d{2}$", row[0]):
-                continue
-            yield row[0], row[1], row[2:]
-
-
-def main(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Scrape NASA eclipse path tables into EclipseTracks.org CZML/JSON files."
-    )
-    parser.add_argument("--czml-dir", type=Path, default=DEFAULT_CZML_DIR,
-                        help="Directory containing events.txt and receiving output (default: %(default)s)")
-    parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR,
-                        help="Cache for downloaded NASA pages (default: %(default)s)")
-    parser.add_argument("--no-cache", action="store_true", help="Always re-download NASA pages")
-    parser.add_argument("--delay", type=float, default=1.0,
-                        help="Seconds to wait before each uncached download (default: %(default)s)")
-    parser.add_argument("isos", nargs="*", help="Only process these event dates (YYYY-MM-DD)")
-    args = parser.parse_args(argv)
-
-    cache_dir = None if args.no_cache else args.cache_dir
-    errors = 0
-    for iso, url, _flags in read_events(args.czml_dir / "events.txt"):
-        if args.isos and iso not in args.isos:
-            continue
-        try:
-            date = datetime.date.fromisoformat(iso)
-            track = EclipseTrack(date)
-            track.loadFromURL(url, cache_dir=cache_dir, delay=args.delay)
-
-            czml_filename = args.czml_dir / (iso + ".czml")
-            czml_filename.write_text(track.czml().dumps())
-            json_filename = args.czml_dir / (iso + ".json")
-            json_filename.write_text(json.dumps(track.json()))
-            print("Wrote %s, %s" % (czml_filename.name, json_filename.name))
-        except Exception:
-            errors += 1
-            print("Error on ISO: " + iso, file=sys.stderr)
-            traceback.print_exc()
-    return 1 if errors else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

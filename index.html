@@ -15,8 +15,8 @@
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <!-- Remaining stylesheets -->
-  <link rel="stylesheet" href="bootstrap.min.css?r=2026-11-16T01:02:41">
-  <link rel="stylesheet" href="main.css?r=2026-11-16T01:02:41">
+  <link rel="stylesheet" href="bootstrap.min.css?r=2026-11-16T03:36:02">
+  <link rel="stylesheet" href="main.css?r=2026-11-16T03:36:02">
 </head>
 <body>
 
@@ -25,9 +25,9 @@
 
     <!-- title block -->
     <div class="nav_block" id="nav_title">
-      <div class="info_block">
+      <div class="info_block" style="text-align: center;">
         <h2><a href="">
-          <image src="favicon.ico" style="vertical-align: text-bottom;"> EclipseTracks<small>.org</small>
+          <image src="favicon.ico" style="vertical-align: baseline; width: 30px; margin-bottom: -3px;"> EclipseTracks<small>.org</small>
         </a></h2>
         <p class="text-muted">Interactive Solar Eclipses with CesiumJS</p>
       </div>
@@ -54,11 +54,12 @@
       <div class="info_block">
         <p class="text-muted">
           &copy; 2026 <a href="">EclipseTracks.org</a><br>
-          Built and maintained by: <a href="https://github.com/Frencil" target="_new">Christoph Clark (Frencil)</a><br>
-          Source code: <a href="https://github.com/Frencil/eclipsetracks" target="_new">github.com/Frencil/eclipsetracks</a><br>
-          Base data from: <a href="http://eclipse.gsfc.nasa.gov/solar.html" target="_new">Fred Espenak, NASA's GSFC</a><br>
+          Built and maintained by: <a href="https://www.frencil.com" target="_new">Christoph Clark (Frencil)</a>
+          <br>
+          Source code: <a href="https://github.com/Frencil/eclipsetracks" target="_new">github.com/Frencil/eclipsetracks</a>
+          <br>
+          Base data from: <a href="http://eclipse.gsfc.nasa.gov/solar.html" target="_new">Fred Espenak, NASA's GSFC</a>
         </p>
-        <p class="text-warning">Umbral shadows are approximations only! <a href="http://squiggle.city/~frencil/archives/20150317.html" target="_new">Details here.</a></p>
       </div>
     </div>
       
@@ -68,8 +69,8 @@
   <div id="cesiumContainer"></div>
 
   <!-- Vendor (lz-string, for compressing camera/clock state into the URL) and application JavaScript -->
-  <script src="vendor.min.js?r=2026-11-16T01:02:41"></script>
-  <script src="eclipsetracks.min.js?r=2026-11-16T01:02:41"></script>
+  <script src="vendor.min.js?r=2026-11-16T03:36:02"></script>
+  <script src="eclipsetracks.min.js?r=2026-11-16T03:36:02"></script>
 
   <!-- Piwik -->
   <script type="text/javascript">

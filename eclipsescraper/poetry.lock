@@ -60,42 +60,6 @@ files = [
 test = ["pytest (>=6)"]
 
 [[package]]
-name = "geographiclib"
-version = "2.0"
-description = "The geodesic routines from GeographicLib"
-optional = false
-python-versions = ">=3.7"
-groups = ["main"]
-files = [
-    {file = "geographiclib-2.0-py3-none-any.whl", hash = "sha256:6b7225248e45ff7edcee32becc4e0a1504c606ac5ee163a5656d482e0cd38734"},
-    {file = "geographiclib-2.0.tar.gz", hash = "sha256:f7f41c85dc3e1c2d3d935ec86660dc3b2c848c83e17f9a9e51ba9d5146a15859"},
-]
-
-[[package]]
-name = "geopy"
-version = "2.5.0"
-description = "Python Geocoding Toolbox"
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-files = [
-    {file = "geopy-2.5.0-py3-none-any.whl", hash = "sha256:8ad8cc226b505ca4d272ae9a2eeba08b8a2c565fc9a04eaefc33ad49c32b51aa"},
-    {file = "geopy-2.5.0.tar.gz", hash = "sha256:7b6c849f18108dcce4faa3d614e2801107b465f7b05fd3c1db9db12e225ae950"},
-]
-
-[package.dependencies]
-geographiclib = ">=1.52,<3"
-
-[package.extras]
-aiohttp = ["aiohttp"]
-dev = ["coverage", "flake8 (>=7.1.2,<7.4)", "isort (>=5.13.2,<8.1)", "pytest (>=3.10)", "pytest-asyncio (>=0.17)", "readme_renderer", "sphinx (<=9.1.0)", "sphinx (<=9.1.0)", "sphinx-issues", "sphinx_rtd_theme (>=3.1.0)"]
-dev-docs = ["readme_renderer", "sphinx (<=9.1.0)", "sphinx-issues", "sphinx_rtd_theme (>=3.1.0)"]
-dev-lint = ["flake8 (>=7.1.2,<7.4)", "isort (>=5.13.2,<8.1)"]
-dev-test = ["coverage", "pytest (>=3.10)", "pytest-asyncio (>=0.17)", "sphinx (<=9.1.0)"]
-requests = ["requests (>=2.16.2)", "urllib3 (>=1.24.2)"]
-timezone = ["pytz"]
-
-[[package]]
 name = "iniconfig"
 version = "2.0.0"
 description = "brain-dead simple config-ini parsing"
@@ -428,4 +392,4 @@ typing-extensions = ">=4.15.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "be6830b42559804b2f79c1fbc85e22b3d545b9f779dc33c0ae5963281281e02a"
+content-hash = "c496cd5cef9caca7c2ad58560400675af09035bf6ebe0fd761a0a026c485a28f"

@@ -96,7 +96,7 @@ Universal  Northern Limit      Southern Limit       Central Line     Diam.  Sun 
                                              'regions': ['arctic', 'europe', 'north atlantic'],
                                              'camera_position': [-6.422, 64.568, 10000000.0]})
         self.assertEqual(normalize_czml(json.loads(test_track.czml().dumps())),
-                         normalize_czml(json.loads(self.expected_czml['20150320'])))
+                         normalize_czml(json.loads(self.expected_czml['20150320'])[:-1]))
 
     # Test the full scraping of the 2017-08-21 event (abbreviated).
     def test_Scrape20170821_loadFromRawHTML(self):
@@ -110,7 +110,7 @@ Universal  Northern Limit      Southern Limit       Central Line     Diam.  Sun 
         self.assertEqual(test_track.data(), self.expected_track['20170821'])
 
         self.assertEqual(normalize_czml(json.loads(test_track.czml().dumps())),
-                         normalize_czml(json.loads(self.expected_czml['20170821'])))
+                         normalize_czml(json.loads(self.expected_czml['20170821'])[:-1]))
 
         test_camera_position = test_track.getCameraPosition()
         self.assertEqual(test_camera_position, [-37.658, 13.577, 10000000.0])
@@ -145,7 +145,6 @@ Universal  Northern Limit      Southern Limit       Central Line     Diam.  Sun 
 
         czml = json.loads(track.czml().dumps())
         self.assertEqual(czml[0]['clock']['interval'], '2052-09-21T23:58:00Z/2052-09-22T00:02:00Z')
-        self.assertEqual(czml[-1]['position']['cartographicDegrees'][0::4], [0, 120, 240])
 
 
 class CommandLineTestCase(unittest.TestCase):
@@ -160,7 +159,8 @@ class CommandLineTestCase(unittest.TestCase):
             (tmp / 'cache' / (hashlib.sha1(url.encode()).hexdigest() + '.html')).write_text(
                 read_fixture('SE2015Mar20Tpath.html'))
             (tmp / 'events.txt').write_text('2015-03-20,%s\n' % url)
-            self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache')]), 0)
+            self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
+                                   '--elements-file', str(tmp / 'elements.json'), 'czml']), 0)
             self.assertEqual(json.loads((tmp / '2015-03-20.json').read_text())['type'], 'total')
             self.assertEqual(json.loads((tmp / '2015-03-20.czml').read_text())[0]['id'], 'document')
 

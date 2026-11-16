@@ -1,7 +1,7 @@
 "use strict";
 
 // Cache-busting key for data files, stamped by `npm run build`
-const cacheKey = "2026-11-16T01:02:41";
+const cacheKey = "2026-11-16T03:36:02";
 
 // Define API key
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZTg5YWQ4MC1lYjRiLTQ5MTItODZmYS01MTUzMzI0ODc5NDMiLCJpZCI6MTkzNTA3LCJpYXQiOjE3MDY4NDk3MzR9.TRMsdXhzoDwuo6OGLTF0JdJA0aOePU52H-mKy0ZgihI";
