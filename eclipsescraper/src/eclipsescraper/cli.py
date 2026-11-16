@@ -35,8 +35,36 @@ def umbral_shadow_path(czml_dir, iso):
     return czml_dir / (iso + ".umbral_shadow.json")
 
 
-def metadata_path(czml_dir, iso):
-    return czml_dir / (iso + ".json")
+# One index of every event for the site's navigation (and which components each has), so
+# the site makes one request rather than one per event
+def events_index_path(czml_dir):
+    return czml_dir / "events.json"
+
+
+def load_events_index(path):
+    """Existing index entries by iso (empty if there's no index yet)."""
+    return {e["iso"]: e for e in json.loads(path.read_text())} if path.exists() else {}
+
+
+def write_events_index(path, all_events, entries):
+    """Write the index for every event in events.txt (in its order), from entries by iso.
+
+    Entries for events no longer listed are dropped, and the bad flag always comes from
+    events.txt. Returns (number written, isos in events.txt with no entry yet, i.e. never
+    generated).
+    """
+    rows, missing = [], []
+    for iso, _url, flags in all_events:
+        if iso not in entries:
+            missing.append(iso)
+            continue
+        entry = {k: v for k, v in entries[iso].items() if k != "bad"}
+        if "bad" in flags:
+            entry["bad"] = True
+        rows.append(json.dumps(entry))
+    # One event per line keeps diffs readable
+    path.write_text("[\n" + ",\n".join(rows) + "\n]\n")
+    return len(rows), missing
 
 
 def load_elements(path):
@@ -95,6 +123,8 @@ def cmd_czml(args, events):
     umbral track, and the umbral shadow (unless --tracks-only, which keeps existing shadow
     files)."""
     all_elements = load_elements(args.elements_file)
+    index_file = events_index_path(args.czml_dir)
+    index = load_events_index(index_file)
 
     def generate(iso, url):
         track = EclipseTrack(datetime.date.fromisoformat(iso))
@@ -121,12 +151,16 @@ def cmd_czml(args, events):
         # The track's clock covers the shadow, since the shadow document has no clock
         track_file = umbral_track_path(args.czml_dir, iso)
         track_file.write_text(track.czml(extra_interval=window).dumps())
-        # The JSON tells the site which component documents to load
-        json_file = metadata_path(args.czml_dir, iso)
-        json_file.write_text(json.dumps({**track.json(), "umbral_shadow": window is not None}))
-        print("Wrote " + ", ".join([track_file.name, json_file.name] + written))
+        # The index entry tells the site which component documents to load
+        index[iso] = {**track.json(), "umbral_shadow": window is not None}
+        print("Wrote " + ", ".join([track_file.name] + written))
 
-    return _each(events, generate)
+    errors = _each(events, generate)
+    count, missing = write_events_index(index_file, list(read_events(args.czml_dir / "events.txt")), index)
+    print("Wrote %s (%d events)" % (index_file.name, count))
+    if missing:
+        print("Not yet generated, so not in %s: %s" % (index_file.name, " ".join(missing)), file=sys.stderr)
+    return errors
 
 
 def main(argv=None):

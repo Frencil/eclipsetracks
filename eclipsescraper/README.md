@@ -24,7 +24,7 @@ poetry run eclipsescraper elements [YYYY-MM-DD ...]  # parse cached Besselian el
 poetry run eclipsescraper czml [YYYY-MM-DD ...]      # generate ../czml/ files from the cache and elements file
 ```
 
-Events are listed in `../czml/events.txt` as `<iso date>,<path table url>[,bad]` (events flagged `bad` are still generated but hidden by the site). The event date must match the date in the URL. For a new event: add it to `events.txt`, then run all three commands for its date.
+Events are listed in `../czml/events.txt` as `<iso date>,<path table url>[,bad]` (events flagged `bad` are still generated but flagged in `events.json` so the site hides them). The event date must match the date in the URL. For a new event: add it to `events.txt`, then run all three commands for its date.
 
 * **Page cache**: `fetch` saves each page under `.cache/`, mirroring NASA's URL paths (e.g. `.cache/eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2027Feb06Apath.html`), and waits `--delay` seconds (default 1) before each download. Pages already cached are never re-downloaded unless you pass `fetch --refresh`. `elements` and `czml` fail with a "run `eclipsescraper fetch`" error if a page they need isn't cached.
 * **Tracks** (northern/southern limits and central line) come from each event's NASA path table, e.g. [SE2027Feb06Apath.html](https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2027Feb06Apath.html).
@@ -35,7 +35,9 @@ Each event gets these files in `../czml/`, one document per component so the sit
 
 * `<iso>.umbral_track.czml`: limits and central line, plus the document clock, which also covers the whole umbral shadow.
 * `<iso>.umbral_shadow.json`: the umbral shadow as a compact "sampled polygon": sample times stored once and vertex coordinates as integer deltas, about a third the size of the equivalent CZML. The site expands it into CZML packets (with no clock) using `../sampled_polygon.js`; `expand_sampled_polygon()` in `shadow.py` is the matching Python reference. Only for events with a modeled shadow.
-* `<iso>.json`: metadata for the site's event list, including `"umbral_shadow": true/false` to say whether to load the shadow.
+Plus one file for all events:
+
+* `events.json`: the site's event list, one event per line in `events.txt` order: type, regions, camera position, `"umbral_shadow": true/false` (whether to load the shadow), and `"bad": true` for events flagged bad (the site hides them). Each `czml` run updates the entries of the events it generates and keeps the others, so generating a single event leaves the index complete; events removed from `events.txt` are dropped and `bad` flags always come from `events.txt`.
 
 See `poetry run eclipsescraper --help` for all options.
 

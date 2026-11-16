@@ -166,9 +166,12 @@ class CommandLineTestCase(unittest.TestCase):
             (tmp / 'events.txt').write_text('2015-03-20,%s\n' % url)
             self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
                                    '--elements-file', str(tmp / 'elements.json'), 'czml']), 0)
-            meta = json.loads((tmp / '2015-03-20.json').read_text())
-            self.assertEqual(meta['type'], 'total')
-            self.assertFalse(meta['umbral_shadow'])
+            index = json.loads((tmp / 'events.json').read_text())
+            self.assertEqual([e['iso'] for e in index], ['2015-03-20'])
+            self.assertEqual(index[0]['type'], 'total')
+            self.assertFalse(index[0]['umbral_shadow'])
+            self.assertNotIn('bad', index[0])
+            self.assertFalse((tmp / '2015-03-20.json').exists())
             self.assertEqual(json.loads((tmp / '2015-03-20.umbral_track.czml').read_text())[0]['id'], 'document')
             self.assertFalse((tmp / '2015-03-20.umbral_shadow.json').exists())
 
@@ -186,10 +189,35 @@ class CommandLineTestCase(unittest.TestCase):
             self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
                                    '--elements-file', str(tmp / 'elements.json'),
                                    'czml', '--tracks-only']), 0)
-            self.assertTrue(json.loads((tmp / '2027-02-06.json').read_text())['umbral_shadow'])
+            self.assertTrue(json.loads((tmp / 'events.json').read_text())[0]['umbral_shadow'])
             doc = json.loads((tmp / '2027-02-06.umbral_track.czml').read_text())
             self.assertEqual(doc[0]['clock']['interval'], '2027-02-06T14:03:53Z/2027-02-06T17:55:25Z')
             self.assertFalse((tmp / '2027-02-06.umbral_shadow.json').exists())
+
+    # Generating a subset of events updates their entries in events.json and keeps the rest,
+    # in events.txt order; the bad flag comes from events.txt and unlisted events are dropped
+    def test_events_index_merge(self):
+        import tempfile
+        url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            seed_cache(tmp / 'cache', url, read_fixture('SE2015Mar20Tpath.html'))
+            (tmp / 'events.txt').write_text(
+                '2014-04-29,https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2014Apr29Apath.html\n'
+                '2015-03-20,%s,bad\n'
+                '2016-03-09,https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2016Mar09Tpath.html\n' % url)
+            (tmp / 'events.json').write_text(json.dumps([
+                {'iso': '2016-03-09', 'type': 'total', 'umbral_shadow': False},
+                {'iso': '1999-08-11', 'type': 'total', 'umbral_shadow': False},
+                {'iso': '2015-03-20', 'type': 'stale', 'umbral_shadow': False},
+            ]))
+            self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
+                                   '--elements-file', str(tmp / 'elements.json'), 'czml', '2015-03-20']), 0)
+            index = json.loads((tmp / 'events.json').read_text())
+            self.assertEqual([e['iso'] for e in index], ['2015-03-20', '2016-03-09'])
+            self.assertEqual(index[0]['type'], 'total')
+            self.assertTrue(index[0]['bad'])
+            self.assertEqual(index[1], {'iso': '2016-03-09', 'type': 'total', 'umbral_shadow': False})
 
     # elements and czml never touch the network: an uncached page is an error, not a download
     def test_generation_is_offline(self):
