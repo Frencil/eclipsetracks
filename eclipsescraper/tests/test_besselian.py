@@ -6,7 +6,7 @@ import unittest
 from eclipsescraper import BesselianElements, EclipseTrack, beselm_url, parse_beselm_html
 from eclipsescraper.shadow import (
     WGS84_A, axis_point, central_interval, shadow_boundary, shadow_interval, shadow_outline,
-    umbral_shadow_packets,
+    shadow_window, umbral_shadow_czml, umbral_shadow_packets,
 )
 
 from .test_eclipsescraper import read_fixture
@@ -226,7 +226,19 @@ class ShadowModelTestCase(unittest.TestCase):
         self.assertTrue(all(-180 <= lon <= 180 for lon in samples[1::4]))
         self.assertTrue(all(-90 <= lat <= 90 for lat in samples[2::4]))
 
-    # The document clock is extended to cover the whole shadow
+    # The track's document clock is extended to cover the whole shadow, which lives in its
+    # own document with no clock
     def test_clock_covers_shadow(self):
-        doc = json.loads(self.track.czml(extra_packets=self.packets, extra_interval=self.packets_interval).dumps())
+        self.assertEqual(shadow_window(self.elements), self.packets_interval)
+        doc = json.loads(self.track.czml(extra_interval=self.packets_interval).dumps())
         self.assertEqual(doc[0]['clock']['interval'], '2027-02-06T14:03:53Z/2027-02-06T17:55:25Z')
+        self.assertFalse(any(p['id'].startswith('umbral_shadow') for p in doc))
+
+    def test_shadow_document(self):
+        document, window = umbral_shadow_czml('2027-02-06', self.elements, n_vertices=12, tolerance_km=50)
+        self.assertEqual(window, self.packets_interval)
+        doc = json.loads(document.dumps())
+        self.assertEqual(doc[0]['id'], 'document')
+        self.assertNotIn('clock', doc[0])
+        self.assertEqual(doc[-1]['id'], 'umbral_shadow_2027-02-06')
+        self.assertEqual(len(doc), 1 + 12 + 1)

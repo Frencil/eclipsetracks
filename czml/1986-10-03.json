@@ -1,1 +1,1 @@
-{"iso": "1986-10-03", "type": "hybrid", "camera_position": [-36.943, 59.12, 10000000.0], "regions": ["arctic", "north atlantic"]}
+{"iso": "1986-10-03", "type": "hybrid", "camera_position": [-36.943, 59.12, 10000000.0], "regions": ["arctic", "north atlantic"], "umbral_shadow": false}

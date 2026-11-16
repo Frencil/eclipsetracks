@@ -1,1 +1,1 @@
-{"iso": "2023-10-14", "type": "annular", "camera_position": [-82.612, 10.783, 10000000.0], "regions": ["central america", "north america", "north pacific", "south america", "south atlantic"]}
+{"iso": "2023-10-14", "type": "annular", "camera_position": [-82.612, 10.783, 10000000.0], "regions": ["central america", "north america", "north pacific", "south america", "south atlantic"], "umbral_shadow": true}

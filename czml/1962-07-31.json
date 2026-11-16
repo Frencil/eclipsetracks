@@ -1,1 +1,1 @@
-{"iso": "1962-07-31", "type": "annular", "camera_position": [-5.712, 11.988, 10000000.0], "regions": ["north atlantic", "northern africa", "south america", "southern africa"]}
+{"iso": "1962-07-31", "type": "annular", "camera_position": [-5.712, 11.988, 10000000.0], "regions": ["north atlantic", "northern africa", "south america", "southern africa"], "umbral_shadow": false}

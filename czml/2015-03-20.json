@@ -1,1 +1,1 @@
-{"iso": "2015-03-20", "type": "total", "camera_position": [-6.422, 64.568, 10000000.0], "regions": ["arctic", "europe", "north atlantic"]}
+{"iso": "2015-03-20", "type": "total", "camera_position": [-6.422, 64.568, 10000000.0], "regions": ["arctic", "europe", "north atlantic"], "umbral_shadow": false}

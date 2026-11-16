@@ -1,1 +1,1 @@
-{"iso": "2048-06-11", "type": "annular", "camera_position": [-10.975, 63.665, 10000000.0], "regions": ["arctic", "europe", "middle east", "north america", "north atlantic", "northern asia"]}
+{"iso": "2048-06-11", "type": "annular", "camera_position": [-10.975, 63.665, 10000000.0], "regions": ["arctic", "europe", "middle east", "north america", "north atlantic", "northern asia"], "umbral_shadow": false}

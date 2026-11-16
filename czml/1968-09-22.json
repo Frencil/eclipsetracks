@@ -1,1 +1,1 @@
-{"iso": "1968-09-22", "type": "total", "camera_position": [64.213, 55.77, 10000000.0], "regions": ["arctic", "eastern asia", "middle east", "northern asia"]}
+{"iso": "1968-09-22", "type": "total", "camera_position": [64.213, 55.77, 10000000.0], "regions": ["arctic", "eastern asia", "middle east", "northern asia"], "umbral_shadow": false}

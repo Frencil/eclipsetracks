@@ -11,7 +11,7 @@ EclipseTracks.org is an entirely static, client-side application (HTML, CSS, Jav
 * `index.html`, `main.css`, `bootstrap.min.css` - page shell and styles
 * `setup.js` - application source, minified into `eclipsetracks.min.js` by the build
 * `vendor.min.js` - third party libraries from npm ([lz-string](https://github.com/pieroxy/lz-string)), bundled by the build
-* `czml/` - one generated CZML file (tracks and shadow) and JSON file (metadata) per eclipse, for every event listed in `czml/events.txt`
+* `czml/` - generated files per eclipse, each CZML component loaded independently by the site: `<iso>.umbral_track.czml` (limits, central line, and the clock), `<iso>.umbral_shadow.czml` (where modeled), and `<iso>.json` (metadata, including which components exist), for every event listed in `czml/events.txt`
 * `eclipsescraper/` - Python tool that generates the contents of `czml/` from [NASA eclipse data](https://eclipse.gsfc.nasa.gov/solar.html). Not part of the website; see [eclipsescraper/README.md](eclipsescraper/README.md).
 
 [CesiumJS](https://github.com/CesiumGS/cesium) is too large to bundle, so it is loaded from Cesium's CDN. Its version is pinned in `package.json` and stamped into the CDN URLs in `index.html` by the build.

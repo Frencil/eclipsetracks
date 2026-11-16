@@ -1,1 +1,1 @@
-{"iso": "2012-05-20", "type": "annular", "camera_position": [176.855, 49.187, 10000000.0], "regions": ["eastern asia", "north america", "north pacific", "northern asia"]}
+{"iso": "2012-05-20", "type": "annular", "camera_position": [176.855, 49.187, 10000000.0], "regions": ["eastern asia", "north america", "north pacific", "northern asia"], "umbral_shadow": false}

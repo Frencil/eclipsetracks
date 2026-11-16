@@ -2,9 +2,9 @@
 
 import csv
 import datetime
-import hashlib
 import re
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -32,15 +32,25 @@ def solid(rgba):
     return SolidColorMaterial(color=Color(rgba=rgba))
 
 
-def fetch_url(url, cache_dir=None, delay=0.0):
-    """Fetch a URL as text, optionally via an on-disk cache keyed by URL."""
-    cache_file = None
-    if cache_dir is not None:
-        cache_dir = Path(cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = cache_dir / (hashlib.sha1(url.encode()).hexdigest() + ".html")
-        if cache_file.exists():
-            return cache_file.read_text(encoding="utf-8")
+class NotCached(Exception):
+    """A NASA page needed for generation hasn't been downloaded; run `eclipsescraper fetch`."""
+
+
+def cache_path(url, cache_dir):
+    """Where a downloaded page is kept: <cache_dir>/<host>/<path>, mirroring NASA's site
+    (http and https URLs share an entry)."""
+    parts = urllib.parse.urlsplit(url)
+    return Path(cache_dir) / parts.netloc / parts.path.lstrip("/")
+
+
+def download(url, cache_dir, delay=0.0, refresh=False):
+    """Download a page into the cache unless it's already there (or refresh is set).
+
+    Returns True if NASA's site was hit. delay is slept before each download to be polite.
+    """
+    path = cache_path(url, cache_dir)
+    if path.exists() and not refresh:
+        return False
     if delay:
         time.sleep(delay)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -48,9 +58,19 @@ def fetch_url(url, cache_dir=None, delay=0.0):
         if r.status != 200:
             raise Exception("Unable to load URL: %s (HTTP %s)" % (url, r.status))
         text = r.read().decode("utf-8", "ignore")
-    if cache_file is not None:
-        cache_file.write_text(text, encoding="utf-8")
-    return text
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+    return True
+
+
+def read_cached(url, cache_dir):
+    """A downloaded page's text, never touching the network."""
+    path = cache_path(url, cache_dir)
+    if not path.exists():
+        raise NotCached("%s is not cached at %s; run `eclipsescraper fetch` first" % (url, path))
+    return path.read_text(encoding="utf-8")
 
 
 def read_events(events_file):

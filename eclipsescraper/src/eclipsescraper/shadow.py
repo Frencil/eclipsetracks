@@ -38,11 +38,11 @@ unless noted as km.
 import datetime
 import math
 
-from czml3 import Packet
+from czml3 import Document, Packet
 from czml3.properties import Material, Polygon, Position, PositionList
 from czml3.types import TimeInterval
 
-from .common import UMBRAL_SHADOW_RGBA, solid
+from .common import CZML_VERSION, UMBRAL_SHADOW_RGBA, solid
 
 # WGS-84
 WGS84_A = 6378137.0
@@ -600,17 +600,15 @@ def adaptive_samples(elements, start, end, n_vertices, step_seconds=60, toleranc
     return samples + [coarse[-1]]
 
 
-def umbral_shadow_packets(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=UMBRAL_SHADOW_RGBA):
-    """CZML packets rendering the umbral shadow as a polygon whose vertices move over time,
-    and the UTC (start, end) interval the shadow is shown.
+def shadow_window(elements):
+    """The UTC (start, end) interval the umbral shadow is shown, or None if it misses Earth.
 
-    Each vertex is a position-only packet with time-sampled positions; the polygon refers to
-    those positions, so Cesium interpolates every vertex between samples. Samples are
-    adaptive (see adaptive_samples) and interpolated linearly.
+    Cheap compared to umbral_shadow_packets, so track CZML can cover it in its clock without
+    generating the shadow.
     """
     interval = shadow_interval(elements)
     if interval is None:
-        return [], None
+        return None
     # Start/end just inside first/last contact, where the shadow is a sliver rather than a point
     inset = datetime.timedelta(milliseconds=50)
     start, end = interval[0] + inset, interval[1] - inset
@@ -618,6 +616,21 @@ def umbral_shadow_packets(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=U
         start += inset
     while shadow_boundary(elements, end) is None:
         end -= inset
+    return start, end
+
+
+def umbral_shadow_packets(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=UMBRAL_SHADOW_RGBA):
+    """CZML packets rendering the umbral shadow as a polygon whose vertices move over time,
+    and the UTC (start, end) interval the shadow is shown (see shadow_window).
+
+    Each vertex is a position-only packet with time-sampled positions; the polygon refers to
+    those positions, so Cesium interpolates every vertex between samples. Samples are
+    adaptive (see adaptive_samples) and interpolated linearly.
+    """
+    window = shadow_window(elements)
+    if window is None:
+        return [], None
+    start, end = window
     samples = adaptive_samples(elements, start, end, n_vertices, tolerance_km=tolerance_km)
 
     epoch = start
@@ -653,3 +666,16 @@ def umbral_shadow_packets(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=U
         )
     )
     return packets, (start, end)
+
+
+def umbral_shadow_czml(iso, elements, **kwargs):
+    """A standalone CZML document for the umbral shadow, loaded alongside the track's CZML.
+
+    It has no clock: the track's document sets the clock, covering shadow_window. Returns
+    (document, window), or (None, None) if the shadow misses Earth.
+    """
+    packets, window = umbral_shadow_packets(iso, elements, **kwargs)
+    if not packets:
+        return None, None
+    document = Packet(id="document", version=CZML_VERSION, name="EclipseTracks.org %s umbral shadow" % iso)
+    return Document(packets=[document] + packets), window

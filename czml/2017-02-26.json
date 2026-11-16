@@ -1,1 +1,1 @@
-{"iso": "2017-02-26", "type": "annular", "camera_position": [-30.987, -34.575, 10000000.0], "regions": ["south america", "south atlantic", "south pacific", "southern africa"]}
+{"iso": "2017-02-26", "type": "annular", "camera_position": [-30.987, -34.575, 10000000.0], "regions": ["south america", "south atlantic", "south pacific", "southern africa"], "umbral_shadow": false}

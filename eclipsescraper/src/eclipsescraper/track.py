@@ -19,7 +19,7 @@ from czml3.properties import (
 )
 from czml3.types import IntervalValue
 
-from .common import CZML_VERSION, TRACK_FILL_RGBA, TRACK_CENTRAL_RGBA, TRACK_LIMIT_RGBA, fetch_url, solid
+from .common import CZML_VERSION, TRACK_FILL_RGBA, TRACK_CENTRAL_RGBA, TRACK_LIMIT_RGBA, read_cached, solid
 
 
 class EclipseTrack:
@@ -54,10 +54,11 @@ class EclipseTrack:
         elif re.search(r"Tpath\.html$", url):
             self.type = 'total'
 
-    def loadFromURL(self, url, cache_dir=None, delay=0.0):
+    # Load from the downloaded page cache (see `eclipsescraper fetch`); never hits the network
+    def loadFromCache(self, url, cache_dir):
         self.url = url
         self.setTypeFromURL(url)
-        self.loadFromRawHTML(fetch_url(url, cache_dir=cache_dir, delay=delay))
+        self.loadFromRawHTML(read_cached(url, cache_dir))
 
     def loadFromRawHTML(self, rawhtml):
         p1 = rawhtml.partition('<pre>')
@@ -313,10 +314,10 @@ class EclipseTrack:
         datetimes = self.datetimes()
         return tuple(d.strftime("%Y-%m-%dT%H:%M:%SZ") for d in (datetimes[0], datetimes[-1]))
 
-    # Generate a CZML document for rendering this track (plus any extra packets, e.g. a shadow).
-    # The clock covers the path table's times, extended to cover extra_interval (UTC datetimes)
-    # if given, e.g. the whole time the shadow is on the Earth.
-    def czml(self, extra_packets=(), extra_interval=None):
+    # Generate a CZML document for rendering this track. The clock covers the path table's
+    # times, extended to cover extra_interval (UTC datetimes) if given, e.g. the whole time the
+    # umbral shadow (a separate CZML document with no clock) is on the Earth.
+    def czml(self, extra_interval=None):
 
         iso = self.date.isoformat()
         start, end = self.interval()
@@ -384,5 +385,4 @@ class EclipseTrack:
                 )
             )
 
-        packets.extend(extra_packets)
         return Document(packets=packets)

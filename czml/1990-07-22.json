@@ -1,1 +1,1 @@
-{"iso": "1990-07-22", "type": "total", "camera_position": [169.435, 64.887, 10000000.0], "regions": ["arctic", "europe", "north pacific", "northern asia"]}
+{"iso": "1990-07-22", "type": "total", "camera_position": [169.435, 64.887, 10000000.0], "regions": ["arctic", "europe", "north pacific", "northern asia"], "umbral_shadow": false}

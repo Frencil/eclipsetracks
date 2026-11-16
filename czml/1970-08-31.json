@@ -1,1 +1,1 @@
-{"iso": "1970-08-31", "type": "annular", "camera_position": [-163.987, -20.327, 10000000.0], "regions": ["south pacific", "southeastern asia"]}
+{"iso": "1970-08-31", "type": "annular", "camera_position": [-163.987, -20.327, 10000000.0], "regions": ["south pacific", "southeastern asia"], "umbral_shadow": false}

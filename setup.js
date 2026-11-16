@@ -1,7 +1,7 @@
 "use strict";
 
 // Cache-busting key for data files, stamped by `npm run build`
-const cacheKey = "2026-11-16T03:36:02";
+const cacheKey = "2026-11-16T09:07:15";
 
 // Define API key
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZTg5YWQ4MC1lYjRiLTQ5MTItODZmYS01MTUzMzI0ODc5NDMiLCJpZCI6MTkzNTA3LCJpYXQiOjE3MDY4NDk3MzR9.TRMsdXhzoDwuo6OGLTF0JdJA0aOePU52H-mKy0ZgihI";
@@ -93,7 +93,8 @@ var eclipses = {
                     var date  = new Date(parts[0]);
                     var iso   = date.toISOString().substr(0,10);
                     var event = { iso: iso, date: date, url: parts[1], region_string: '',
-                                  czml_path: 'czml/' + iso + '.czml?r=' + cacheKey,
+                                  umbral_track_path: 'czml/' + iso + '.umbral_track.czml?r=' + cacheKey,
+                                  umbral_shadow_path: 'czml/' + iso + '.umbral_shadow.czml?r=' + cacheKey,
                                   json_path: 'czml/' + iso + '.json?r=' + cacheKey };
 
                     // Store events in an associative array with an iso index for walking
@@ -117,6 +118,7 @@ var eclipses = {
                     eclipses.events[iso].type = json.type;
                     eclipses.events[iso].regions = json.regions;
                     eclipses.events[iso].camera_position = json.camera_position;
+                    eclipses.events[iso].has_umbral_shadow = json.umbral_shadow === true;
                     eclipses.events[iso].region_string = eclipses.formatRegionString(json.regions);
                 });
 
@@ -200,10 +202,13 @@ var eclipses = {
         var eclipse = this.events[iso];
         this.selected_iso = iso;
 
-        // Load CZML into the viewer and set viewer camera/clock from hash if necessary
-        var czml_path = eclipse.czml_path;
-        var czmlDataSource = new Cesium.CzmlDataSource();
-        czmlDataSource.load(czml_path).then(function() {
+        // Load the umbral track CZML into the viewer and set viewer camera/clock from hash if
+        // necessary. The umbral shadow (if any) is a separate, much larger CZML document
+        // loaded independently, so the track can appear first on slow connections.
+        var trackDataSource = new Cesium.CzmlDataSource();
+        trackDataSource.load(eclipse.umbral_track_path).then(function() {
+            // Ignore loads that finish after the user has moved on to another event
+            if (eclipses.selected_iso != iso) { return; }
             var shouldFlyTo = true;
             if (!hasTriedToLoadUrlHash) {
                 hashToViewer();
@@ -221,7 +226,17 @@ var eclipses = {
                 viewer.clock.shouldAnimate = true;
             }
         });
-        viewer.dataSources.add(czmlDataSource);
+        viewer.dataSources.add(trackDataSource);
+        if (eclipse.has_umbral_shadow) {
+            var shadowDataSource = new Cesium.CzmlDataSource();
+            shadowDataSource.load(eclipse.umbral_shadow_path).catch(function(err) {
+                console.warn("Unable to load umbral shadow for " + iso + ": " + err);
+            });
+            viewer.dataSources.add(shadowDataSource);
+        }
+        // The viewer's clock follows the most recently added data source, but only the umbral
+        // track document defines a clock (covering the whole shadow), so track that one
+        viewer.clockTrackedDataSource = trackDataSource;
 
         // Visually select/highlight everything
         var type = eclipse.type.ucwords();

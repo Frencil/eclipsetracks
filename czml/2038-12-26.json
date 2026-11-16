@@ -1,1 +1,1 @@
-{"iso": "2038-12-26", "type": "total", "camera_position": [164.515, -40.327, 10000000.0], "regions": ["australia / new zealand", "south pacific"]}
+{"iso": "2038-12-26", "type": "total", "camera_position": [164.515, -40.327, 10000000.0], "regions": ["australia / new zealand", "south pacific"], "umbral_shadow": false}

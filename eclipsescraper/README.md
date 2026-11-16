@@ -16,20 +16,28 @@ This creates a virtualenv in `.venv/` (see `poetry.toml`) with the `eclipsescrap
 
 ## Run the Scraper
 
-The scraper has two steps, each optionally limited to specific event dates:
+Scraping NASA and generating files are separate steps. Only `fetch` contacts NASA's site; everything after it runs from local copies, so CZML can be regenerated as often as the rendering logic changes. Each command can be limited to specific event dates:
 
 ```
-poetry run eclipsescraper elements [YYYY-MM-DD ...]  # scrape Besselian elements into data/besselian_elements.json
-poetry run eclipsescraper czml [YYYY-MM-DD ...]      # generate ../czml/<date>.czml and .json for events
+poetry run eclipsescraper fetch [YYYY-MM-DD ...]     # download NASA pages into .cache/ (skips pages already there)
+poetry run eclipsescraper elements [YYYY-MM-DD ...]  # parse cached Besselian elements into data/besselian_elements.json
+poetry run eclipsescraper czml [YYYY-MM-DD ...]      # generate ../czml/ files from the cache and elements file
 ```
 
-Events are listed in `../czml/events.txt` as `<iso date>,<path table url>[,bad]` (events flagged `bad` are still generated but hidden by the site). The event date must match the date in the URL.
+Events are listed in `../czml/events.txt` as `<iso date>,<path table url>[,bad]` (events flagged `bad` are still generated but hidden by the site). The event date must match the date in the URL. For a new event: add it to `events.txt`, then run all three commands for its date.
 
+* **Page cache**: `fetch` saves each page under `.cache/`, mirroring NASA's URL paths (e.g. `.cache/eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2027Feb06Apath.html`), and waits `--delay` seconds (default 1) before each download. Pages already cached are never re-downloaded unless you pass `fetch --refresh`. `elements` and `czml` fail with a "run `eclipsescraper fetch`" error if a page they need isn't cached.
 * **Tracks** (northern/southern limits and central line) come from each event's NASA path table, e.g. [SE2027Feb06Apath.html](https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2027Feb06Apath.html).
-* **Besselian elements** come from the companion page, e.g. [SE2027Feb06Abeselm.html](https://eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm2001/SE2027Feb06Abeselm.html). They're parsed into `data/besselian_elements.json` (committed; one event per line) so CZML generation doesn't depend on re-scraping.
-* **Umbral shadow**: for events selected by `has_shadow()` (`src/eclipsescraper/cli.py`; currently the 2020s as a pilot), the shadow is modeled from the Besselian elements on the WGS-84 ellipsoid (`src/eclipsescraper/shadow.py`): the umbral cone intersected with the sunlit side of the Earth, bounded by the sunrise/sunset line where it hangs off the limb. It's rendered as a polygon whose vertices move over time, for the whole time any of the umbra is on the Earth, and the CZML clock is extended to cover that time. The model reproduces NASA's tabulated limits and central line to their rounding (~0.2 km).
+* **Besselian elements** come from the companion page, e.g. [SE2027Feb06Abeselm.html](https://eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm2001/SE2027Feb06Abeselm.html). They're parsed into `data/besselian_elements.json` (committed; one event per line).
+* **Umbral shadow**: for events selected by `has_umbral_shadow()` (`src/eclipsescraper/cli.py`; currently the 2020s as a pilot), the shadow is modeled from the Besselian elements on the WGS-84 ellipsoid (`src/eclipsescraper/shadow.py`): the umbral cone intersected with the sunlit side of the Earth, bounded by the sunrise/sunset line where it hangs off the limb. It's rendered as a polygon whose vertices move over time, for the whole time any of the umbra is on the Earth. The model reproduces NASA's tabulated limits and central line to their rounding (~0.2 km). Generating it takes about a minute per event; `czml --tracks-only` skips it, keeping existing shadow files.
 
-Downloaded pages are cached in `.cache/` so reruns don't hit NASA again; pass `--no-cache` to force fresh downloads. See `poetry run eclipsescraper --help` for all options.
+Each event gets these files in `../czml/`, one CZML document per component so the site can load them independently:
+
+* `<iso>.umbral_track.czml`: limits and central line, plus the document clock, which also covers the whole umbral shadow.
+* `<iso>.umbral_shadow.czml`: the umbral shadow, with no clock. Only for events with a modeled shadow.
+* `<iso>.json`: metadata for the site's event list, including `"umbral_shadow": true/false` to say whether to load the shadow.
+
+See `poetry run eclipsescraper --help` for all options.
 
 After regenerating data, run `npm run build` from the repository root to update the cache key so browsers fetch the new files.
 

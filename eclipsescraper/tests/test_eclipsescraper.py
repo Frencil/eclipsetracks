@@ -10,6 +10,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 # NASA pages are Latin-1; decode the same way the scraper does
+def seed_cache(cache_dir, url, text):
+    from eclipsescraper.common import cache_path
+    path = cache_path(url, cache_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
 def read_fixture(name):
     return (FIXTURES / name).read_bytes().decode('utf-8', 'ignore')
 
@@ -151,18 +158,79 @@ class CommandLineTestCase(unittest.TestCase):
 
     # Run the CLI end to end against a temporary czml dir using a pre-seeded page cache
     def test_main(self):
-        import hashlib, tempfile
+        import tempfile
         url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
-            (tmp / 'cache').mkdir()
-            (tmp / 'cache' / (hashlib.sha1(url.encode()).hexdigest() + '.html')).write_text(
-                read_fixture('SE2015Mar20Tpath.html'))
+            seed_cache(tmp / 'cache', url, read_fixture('SE2015Mar20Tpath.html'))
             (tmp / 'events.txt').write_text('2015-03-20,%s\n' % url)
             self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
                                    '--elements-file', str(tmp / 'elements.json'), 'czml']), 0)
-            self.assertEqual(json.loads((tmp / '2015-03-20.json').read_text())['type'], 'total')
-            self.assertEqual(json.loads((tmp / '2015-03-20.czml').read_text())[0]['id'], 'document')
+            meta = json.loads((tmp / '2015-03-20.json').read_text())
+            self.assertEqual(meta['type'], 'total')
+            self.assertFalse(meta['umbral_shadow'])
+            self.assertEqual(json.loads((tmp / '2015-03-20.umbral_track.czml').read_text())[0]['id'], 'document')
+            self.assertFalse((tmp / '2015-03-20.umbral_shadow.czml').exists())
+
+    # --tracks-only skips shadow generation but still flags the shadow and extends the clock
+    def test_main_tracks_only(self):
+        import tempfile
+        from eclipsescraper.besselian import parse_beselm_html
+        url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2027Feb06Apath.html'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            seed_cache(tmp / 'cache', url, read_fixture('SE2027Feb06Apath.html'))
+            (tmp / 'events.txt').write_text('2027-02-06,%s\n' % url)
+            (tmp / 'elements.json').write_text(json.dumps(
+                {'2027-02-06': parse_beselm_html(read_fixture('SE2027Feb06Abeselm.html'))}))
+            self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
+                                   '--elements-file', str(tmp / 'elements.json'),
+                                   'czml', '--tracks-only']), 0)
+            self.assertTrue(json.loads((tmp / '2027-02-06.json').read_text())['umbral_shadow'])
+            doc = json.loads((tmp / '2027-02-06.umbral_track.czml').read_text())
+            self.assertEqual(doc[0]['clock']['interval'], '2027-02-06T14:03:53Z/2027-02-06T17:55:25Z')
+            self.assertFalse((tmp / '2027-02-06.umbral_shadow.czml').exists())
+
+    # elements and czml never touch the network: an uncached page is an error, not a download
+    def test_generation_is_offline(self):
+        import tempfile
+        from unittest import mock
+        url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch('urllib.request.urlopen', side_effect=AssertionError('network used')):
+            tmp = Path(tmp)
+            (tmp / 'events.txt').write_text('2015-03-20,%s\n' % url)
+            for command in ('elements', 'czml'):
+                self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
+                                       '--elements-file', str(tmp / 'elements.json'), command]), 1)
+            self.assertFalse((tmp / '2015-03-20.umbral_track.czml').exists())
+
+    # fetch downloads only what isn't cached (unless --refresh), into URL-mirroring paths
+    def test_fetch(self):
+        import tempfile
+        from unittest import mock
+        from eclipsescraper.common import cache_path
+        url = 'http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
+        beselm = 'https://eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm2001/SE2015Mar20Tbeselm.html'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / 'events.txt').write_text('2015-03-20,%s\n' % url)
+            seed_cache(tmp / 'cache', url, 'cached path table')
+            response = mock.MagicMock(status=200)
+            response.__enter__.return_value.read.return_value = b'downloaded'
+            response.__enter__.return_value.status = 200
+            args = ['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'), 'fetch', '--delay', '0']
+            with mock.patch('urllib.request.urlopen', return_value=response) as urlopen:
+                self.assertEqual(main(args), 0)
+                self.assertEqual([c.args[0].full_url for c in urlopen.call_args_list], [beselm])
+                self.assertEqual(cache_path(beselm, tmp / 'cache'),
+                                 tmp / 'cache/eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm2001/SE2015Mar20Tbeselm.html')
+                self.assertEqual(cache_path(beselm, tmp / 'cache').read_text(), 'downloaded')
+                self.assertEqual(main(args), 0)
+                self.assertEqual(urlopen.call_count, 1)
+                self.assertEqual(main(args + ['--refresh']), 0)
+                self.assertEqual(urlopen.call_count, 3)
+            self.assertEqual(cache_path(url, tmp / 'cache').read_text(), 'downloaded')
 
 
 if __name__ == '__main__':

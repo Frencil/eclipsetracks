@@ -1,1 +1,1 @@
-{"iso": "1998-02-26", "type": "total", "camera_position": [-82.547, 4.817, 10000000.0], "regions": ["central america", "north atlantic", "south america", "south pacific"]}
+{"iso": "1998-02-26", "type": "total", "camera_position": [-82.547, 4.817, 10000000.0], "regions": ["central america", "north atlantic", "south america", "south pacific"], "umbral_shadow": false}
