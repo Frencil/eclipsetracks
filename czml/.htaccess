@@ -1,0 +1,6 @@
+# Serve CZML with a JSON content type (Apache doesn't know .czml) and gzip all JSON here.
+# Event data is highly repetitive numeric JSON, so it compresses about 3x.
+AddType application/json .czml
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
