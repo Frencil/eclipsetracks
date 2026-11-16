@@ -1,11 +1,7 @@
 "use strict";
 
-// Global to track if we can use promises or not
-var canUsePromises = false;
-if (typeof Promise !== "undefined" && Promise.toString().indexOf("[native code]") !== -1){
-    canUsePromises = true;
-}
-var json_reqs = [];
+// Cache-busting key for data files, stamped by `npm run build`
+const cacheKey = "2026-11-16T01:02:41";
 
 // Define API key
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZTg5YWQ4MC1lYjRiLTQ5MTItODZmYS01MTUzMzI0ODc5NDMiLCJpZCI6MTkzNTA3LCJpYXQiOjE3MDY4NDk3MzR9.TRMsdXhzoDwuo6OGLTF0JdJA0aOePU52H-mKy0ZgihI";
@@ -15,10 +11,11 @@ String.prototype.ucwords = function(){
     return this.toLowerCase().replace(/\b[a-z]/g, function(letter) { return letter.toUpperCase(); });
 };
 
-// Get the default list of available imagery providers.
+// Get the default list of available imagery providers and select Bing Maps with labels.
 var availableBaseLayers = Cesium.createDefaultImageryProviderViewModels();
-// Select the second entry, Bing maps with Labels turned on.
-var defaultImageryProviderViewModel = availableBaseLayers[1];
+var defaultImageryProviderViewModel = availableBaseLayers.find(function(vm) {
+    return vm.name === "Bing Maps Aerial with Labels";
+}) || availableBaseLayers[0];
 
 // Top-level var for working with the Cesium viewer
 var viewer = new Cesium.Viewer('cesiumContainer', {
@@ -73,145 +70,72 @@ var eclipses = {
         return region_string;
     },
 
-    loadJSONPromise: function(url) {
-        return new Promise(function(resolve, reject) {
-            var req = new XMLHttpRequest();
-            req.open('GET', url);
-            
-            req.onload = function() {
-                if (req.status == 200) {
-                    resolve(req.response);
-                } else {
-                    reject(Error(req.statusText));
-                }
-            };
-            
-            req.onerror = function() {
-                reject(Error("Network Error"));
-            };
-            
-            req.send();
-        });
-    },
-
-    loadJSONnoPromise: function(iso) {
-        var req = new XMLHttpRequest();
-        req.onload = function(){
-            if (req.status == 200){
-                try {
-                    var json = JSON.parse(req.responseText);
-                    var iso  = json.iso;
-                    eclipses.events[iso].type = json.type;
-                    eclipses.events[iso].regions = json.regions;
-                    eclipses.events[iso].camera_position = json.camera_position;
-                    eclipses.events[iso].region_string = eclipses.formatRegionString(eclipses.events[iso].regions);
-                    eclipses.loadCurrentAndNavNoPromise();
-                } catch(err) {
-                    console.warn("Unable to load " + iso + " JSON: " + err.message);
-                }
-            }
-        };
-        req.open("GET", this.events[iso].json_path + '?t=' + new Date().getTime());
-        req.send();
-        json_reqs.push(req);
-    },
-
-    loadCurrentAndNavNoPromise: function() {
-        var all_loaded = true;
-        for (var i = 0; i < eclipses.isos.length; i++){
-            if (typeof json_reqs[i] == "undefined"){
-                all_loaded = false;
-                break;
-            } else if (json_reqs[i].status != 200){
-                all_loaded = false;
-                break;
-            }
-        }
-        if (all_loaded){
-            // Determine the target to load first (from URL or the next occurring event)
-            var target_iso = eclipses.getIsoToShow();
-            if (!target_iso){ target_iso = eclipses.getNearestFutureIso(); }
-            // Render eclipse navigation
-            this.renderNav(target_iso);
-            // Scroll the nav to the current event
-            this.navCenterScroll(target_iso);
-            // Render the most current event
-            this.renderEclipse(target_iso);
-        }
-    },
-
+    // Load events.txt, then the JSON metadata for every event, then render
     loadEvents: function() {
-        var promises = [];
+        fetch('czml/events.txt?r=' + cacheKey)
+            .then(function(response) {
+                if (!response.ok) { throw new Error("Unable to load events.txt: " + response.status); }
+                return response.text();
+            })
+            .then(function(raw) {
+                var lines = raw.split("\n");
+                var requests = [];
+                for (var i = 0; i < lines.length; i++) {
 
-        // Initialize variables, read local storage
-        var frame = document.getElementById("czml_events");
-        var raw   = frame.contentWindow.document.body.childNodes[0].innerHTML;
-        var lines = raw.split("\n");
-        
-        // Parse czml event data into usable array of objects
-        for (var i = 0; i < lines.length; i++) {
+                    if (lines[i].indexOf(",") == -1) { continue; }
 
-            if (lines[i].indexOf(",") == -1) { continue; }
+                    var parts = lines[i].trim().split(",");
 
-            var parts = lines[i].split(",");
+                    // Some events are known bad (they freeze Cesium) so let's skip those
+                    if (parts[2] == 'bad'){ continue; }
 
-            // Some events are known bad (they freeze Cesium) so let's skip those
-            if (parts[2] == 'bad'){ continue; }
+                    // Parse the line into a fully formed object
+                    var date  = new Date(parts[0]);
+                    var iso   = date.toISOString().substr(0,10);
+                    var event = { iso: iso, date: date, url: parts[1], region_string: '',
+                                  czml_path: 'czml/' + iso + '.czml?r=' + cacheKey,
+                                  json_path: 'czml/' + iso + '.json?r=' + cacheKey };
 
-            // Parse the line into a fully formed object
-            var date  = new Date(parts[0]);
-            var iso   = date.toISOString().substr(0,10);
-            var czml_path = 'czml/' + iso + '.czml';
-            var json_path = 'czml/' + iso + '.json';
-            var json_req = new XMLHttpRequest();
-            var event = { iso: iso, date: date, url: parts[1], region_string: '',
-                          czml_path: czml_path, json_path: json_path, json_req: json_req };
-
-            // Store events in an associative array with an iso index for walking
-            this.isos.push(iso);
-            this.events[iso] = event;
-
-            // Load JSON for the event
-            if (canUsePromises){
-                promises.push(this.loadJSONPromise(json_path));
-            } else {
-                this.loadJSONnoPromise(iso);
-            }
-
-        }
-
-        if (canUsePromises){
-
-            Promise.all(promises).then(function(dataArray) {
-            
-                dataArray.forEach(function(data) {
-                    var json = JSON.parse(data);
+                    // Store events in an associative array with an iso index for walking
+                    eclipses.isos.push(iso);
+                    eclipses.events[iso] = event;
+                    requests.push(fetch(event.json_path).then(function(response) {
+                        if (!response.ok) { throw new Error(response.url + ": " + response.status); }
+                        return response.json();
+                    }));
+                }
+                return Promise.allSettled(requests);
+            })
+            .then(function(results) {
+                results.forEach(function(result) {
+                    if (result.status != "fulfilled") {
+                        console.warn("Unable to load event JSON: " + result.reason);
+                        return;
+                    }
+                    var json = result.value;
                     var iso  = json.iso;
                     eclipses.events[iso].type = json.type;
                     eclipses.events[iso].regions = json.regions;
                     eclipses.events[iso].camera_position = json.camera_position;
-                    eclipses.events[iso].region_string = eclipses.formatRegionString(eclipses.events[iso].regions);
+                    eclipses.events[iso].region_string = eclipses.formatRegionString(json.regions);
                 });
 
                 // Determine the target to load first (from URL or the next occurring event)
                 var target_iso = eclipses.getIsoToShow();
                 if (!target_iso){ target_iso = eclipses.getNearestFutureIso(); }
-                
+
                 // Render eclipse navigation
                 eclipses.renderNav(target_iso);
 
                 // Scroll the nav to the current event
                 eclipses.navCenterScroll(target_iso);
-                
+
                 // Render the most current event
                 eclipses.renderEclipse(target_iso);
-                
-            }).catch(function(err) {
+            })
+            .catch(function(err) {
                 console.error(err);
             });
-
-        }
-
     },
 
     getNearestFutureIso: function() {
@@ -427,8 +351,8 @@ function viewerToHash() {
         7, // up.x
         7, // up.y
         7, // up.z
-        null, // _currentTime.dayNumber
-        function(v){ return Math.round(v); }, // _currentTime.secondsOfDay
+        null, // currentTime.dayNumber
+        function(v){ return Math.round(v); }, // currentTime.secondsOfDay
         function(v){ return v ? 1 : 0; }, // shouldAnimate
     ];
     return LZString.compressToEncodedURIComponent(
@@ -443,8 +367,8 @@ function viewerToHash() {
                 viewer.camera.up.x,
                 viewer.camera.up.y,
                 viewer.camera.up.z,
-                viewer.clock._currentTime.dayNumber,
-                viewer.clock._currentTime.secondsOfDay,
+                viewer.clock.currentTime.dayNumber,
+                viewer.clock.currentTime.secondsOfDay,
                 viewer.clock.shouldAnimate ? 1 : 0,
             ].map(function(value, idx) {
                 var mapValue = viewerToHashValueMap[idx];
@@ -493,8 +417,7 @@ function hashToViewer() {
             up: new Cesium.Cartesian3(floats[6], floats[7], floats[8]),
         },
     });
-    viewer.clock._currentTime.dayNumber = floats[9];
-    viewer.clock._currentTime.secondsOfDay = floats[10];
+    viewer.clock.currentTime = new Cesium.JulianDate(floats[9], floats[10]);
     viewer.clock.shouldAnimate = (values[11] == 1);
 
     urlLoadHashSucceeded = true;
@@ -510,8 +433,10 @@ viewer.camera.moveEnd.addEventListener(function() {
         }
         window.history.pushState(
             currentTrack.iso,
-            "EclipseTracks.org | " +  + " " + currentTrack.type + " Solar Eclipse",
+            "EclipseTracks.org | " + currentTrack.iso + " " + currentTrack.type + " Solar Eclipse",
             "?show=" + currentTrack.iso + "#" + viewerToHash()
         );
     }
 });
+
+eclipses.loadEvents();
