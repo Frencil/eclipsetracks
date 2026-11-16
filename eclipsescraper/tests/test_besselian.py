@@ -6,7 +6,7 @@ import unittest
 from eclipsescraper import BesselianElements, EclipseTrack, beselm_url, parse_beselm_html
 from eclipsescraper.shadow import (
     WGS84_A, axis_point, central_interval, shadow_boundary, shadow_interval, shadow_outline,
-    shadow_window, umbral_shadow_czml, umbral_shadow_packets,
+    adaptive_samples, expand_sampled_polygon, shadow_window, umbral_shadow_compact,
 )
 
 from .test_eclipsescraper import read_fixture
@@ -126,8 +126,9 @@ class ShadowModelTestCase(unittest.TestCase):
         cls.track.loadFromRawHTML(cls.html)
         cls.shadow = shadow_interval(cls.elements)
         # Coarse tolerance keeps this fast; structure is what's tested here
-        cls.packets, cls.packets_interval = umbral_shadow_packets(
+        cls.compact, cls.packets_interval = umbral_shadow_compact(
             '2027-02-06', cls.elements, n_vertices=12, tolerance_km=50)
+        cls.packets = expand_sampled_polygon(json.loads(json.dumps(cls.compact)))
 
     def offsets(self, seconds):
         """Times the given offsets after first contact and before last contact."""
@@ -213,18 +214,40 @@ class ShadowModelTestCase(unittest.TestCase):
 
     def test_shadow_packets(self):
         self.assertTrue(self.shadow[0] < self.packets_interval[0] < self.packets_interval[1] < self.shadow[1])
-        packets = [json.loads(p.to_json()) for p in self.packets]
-        vertices, polygon = packets[:-1], packets[-1]
+        document, vertices, polygon = self.packets[0], self.packets[1:-1], self.packets[-1]
+        self.assertEqual(document, {'id': 'document', 'version': '1.1',
+                                    'name': 'EclipseTracks.org 2027-02-06 umbral shadow'})
         self.assertEqual(len(vertices), 12)
+        self.assertEqual(vertices[0]['id'], 'umbral_shadow_vertex_00_2027-02-06')
         self.assertEqual(polygon['id'], 'umbral_shadow_2027-02-06')
         self.assertEqual(polygon['polygon']['positions']['references'],
                          [v['id'] + '#position' for v in vertices])
         self.assertEqual(polygon['polygon']['material']['solidColor']['color']['rgba'], [0, 0, 0, 160])
         samples = vertices[0]['position']['cartographicDegrees']
         times = samples[0::4]
-        self.assertEqual(times, sorted(times))
+        self.assertEqual(times[0], 0)
+        self.assertEqual(times, sorted(set(times)))
         self.assertTrue(all(-180 <= lon <= 180 for lon in samples[1::4]))
         self.assertTrue(all(-90 <= lat <= 90 for lat in samples[2::4]))
+
+    # The compact form expands to the model's samples: times to the millisecond and
+    # coordinates to 1e-4 degrees
+    def test_compact_is_lossless(self):
+        start, end = self.packets_interval
+        expected = adaptive_samples(self.elements, start, end, 12, tolerance_km=50)
+        for vertex_index in (0, 5):
+            samples = self.packets[1 + vertex_index]['position']['cartographicDegrees']
+            self.assertEqual(len(samples), 4 * len(expected))
+            for k, (t, outline) in enumerate(expected):
+                self.assertAlmostEqual(samples[4 * k], (t - start).total_seconds(), delta=0.0005 + 1e-9)
+                self.assertAlmostEqual(samples[4 * k + 1], outline[vertex_index][0], delta=0.5e-4 + 1e-9)
+                self.assertAlmostEqual(samples[4 * k + 2], outline[vertex_index][1], delta=0.5e-4 + 1e-9)
+
+    # The expanded packets are valid CZML (as czml3 understands it)
+    def test_expanded_is_czml(self):
+        from czml3 import Document, Packet
+        doc = json.loads(Document(packets=[Packet(**p) for p in self.packets]).dumps())
+        self.assertEqual(len(doc), len(self.packets))
 
     # The track's document clock is extended to cover the whole shadow, which lives in its
     # own document with no clock
@@ -234,11 +257,6 @@ class ShadowModelTestCase(unittest.TestCase):
         self.assertEqual(doc[0]['clock']['interval'], '2027-02-06T14:03:53Z/2027-02-06T17:55:25Z')
         self.assertFalse(any(p['id'].startswith('umbral_shadow') for p in doc))
 
-    def test_shadow_document(self):
-        document, window = umbral_shadow_czml('2027-02-06', self.elements, n_vertices=12, tolerance_km=50)
-        self.assertEqual(window, self.packets_interval)
-        doc = json.loads(document.dumps())
-        self.assertEqual(doc[0]['id'], 'document')
-        self.assertNotIn('clock', doc[0])
-        self.assertEqual(doc[-1]['id'], 'umbral_shadow_2027-02-06')
-        self.assertEqual(len(doc), 1 + 12 + 1)
+    def test_compact_rejects_unknown_format(self):
+        with self.assertRaises(ValueError):
+            expand_sampled_polygon({**self.compact, 'version': 2})

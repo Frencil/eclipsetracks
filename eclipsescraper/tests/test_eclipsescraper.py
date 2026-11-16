@@ -170,7 +170,7 @@ class CommandLineTestCase(unittest.TestCase):
             self.assertEqual(meta['type'], 'total')
             self.assertFalse(meta['umbral_shadow'])
             self.assertEqual(json.loads((tmp / '2015-03-20.umbral_track.czml').read_text())[0]['id'], 'document')
-            self.assertFalse((tmp / '2015-03-20.umbral_shadow.czml').exists())
+            self.assertFalse((tmp / '2015-03-20.umbral_shadow.json').exists())
 
     # --tracks-only skips shadow generation but still flags the shadow and extends the clock
     def test_main_tracks_only(self):
@@ -189,7 +189,7 @@ class CommandLineTestCase(unittest.TestCase):
             self.assertTrue(json.loads((tmp / '2027-02-06.json').read_text())['umbral_shadow'])
             doc = json.loads((tmp / '2027-02-06.umbral_track.czml').read_text())
             self.assertEqual(doc[0]['clock']['interval'], '2027-02-06T14:03:53Z/2027-02-06T17:55:25Z')
-            self.assertFalse((tmp / '2027-02-06.umbral_shadow.czml').exists())
+            self.assertFalse((tmp / '2027-02-06.umbral_shadow.json').exists())
 
     # elements and czml never touch the network: an uncached page is an error, not a download
     def test_generation_is_offline(self):

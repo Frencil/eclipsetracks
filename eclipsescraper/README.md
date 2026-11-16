@@ -31,10 +31,10 @@ Events are listed in `../czml/events.txt` as `<iso date>,<path table url>[,bad]`
 * **Besselian elements** come from the companion page, e.g. [SE2027Feb06Abeselm.html](https://eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm2001/SE2027Feb06Abeselm.html). They're parsed into `data/besselian_elements.json` (committed; one event per line).
 * **Umbral shadow**: for events selected by `has_umbral_shadow()` (`src/eclipsescraper/cli.py`; currently the 2020s as a pilot), the shadow is modeled from the Besselian elements on the WGS-84 ellipsoid (`src/eclipsescraper/shadow.py`): the umbral cone intersected with the sunlit side of the Earth, bounded by the sunrise/sunset line where it hangs off the limb. It's rendered as a polygon whose vertices move over time, for the whole time any of the umbra is on the Earth. The model reproduces NASA's tabulated limits and central line to their rounding (~0.2 km). Generating it takes about a minute per event; `czml --tracks-only` skips it, keeping existing shadow files.
 
-Each event gets these files in `../czml/`, one CZML document per component so the site can load them independently:
+Each event gets these files in `../czml/`, one document per component so the site can load them independently:
 
 * `<iso>.umbral_track.czml`: limits and central line, plus the document clock, which also covers the whole umbral shadow.
-* `<iso>.umbral_shadow.czml`: the umbral shadow, with no clock. Only for events with a modeled shadow.
+* `<iso>.umbral_shadow.json`: the umbral shadow as a compact "sampled polygon": sample times stored once and vertex coordinates as integer deltas, about a third the size of the equivalent CZML. The site expands it into CZML packets (with no clock) using `../sampled_polygon.js`; `expand_sampled_polygon()` in `shadow.py` is the matching Python reference. Only for events with a modeled shadow.
 * `<iso>.json`: metadata for the site's event list, including `"umbral_shadow": true/false` to say whether to load the shadow.
 
 See `poetry run eclipsescraper --help` for all options.

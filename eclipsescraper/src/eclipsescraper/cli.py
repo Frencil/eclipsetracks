@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .besselian import BesselianElements, beselm_url, parse_beselm_html
 from .common import DEFAULT_CACHE_DIR, DEFAULT_CZML_DIR, DEFAULT_ELEMENTS_FILE, download, read_cached, read_events
-from .shadow import shadow_window, umbral_shadow_czml
+from .shadow import shadow_window, umbral_shadow_compact
 from .track import EclipseTrack
 
 # Events that get the Besselian-modeled umbral shadow. Pilot: all events in the 2020s;
@@ -30,8 +30,9 @@ def umbral_track_path(czml_dir, iso):
     return czml_dir / (iso + ".umbral_track.czml")
 
 
+# The umbral shadow is a compact sampled polygon (JSON) that the site expands into CZML
 def umbral_shadow_path(czml_dir, iso):
-    return czml_dir / (iso + ".umbral_shadow.czml")
+    return czml_dir / (iso + ".umbral_shadow.json")
 
 
 def metadata_path(czml_dir, iso):
@@ -109,9 +110,9 @@ def cmd_czml(args, events):
             if args.tracks_only:
                 window = shadow_window(elements)
             else:
-                document, window = umbral_shadow_czml(iso, elements)
-                if document is not None:
-                    shadow_file.write_text(document.dumps())
+                compact, window = umbral_shadow_compact(iso, elements)
+                if compact is not None:
+                    shadow_file.write_text(json.dumps(compact, separators=(",", ":")))
                     written.append(shadow_file.name)
         if window is None and shadow_file.exists():
             shadow_file.unlink()

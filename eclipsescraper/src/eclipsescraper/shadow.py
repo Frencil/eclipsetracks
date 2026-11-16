@@ -38,11 +38,8 @@ unless noted as km.
 import datetime
 import math
 
-from czml3 import Document, Packet
-from czml3.properties import Material, Polygon, Position, PositionList
-from czml3.types import TimeInterval
 
-from .common import CZML_VERSION, UMBRAL_SHADOW_RGBA, solid
+from .common import CZML_VERSION, UMBRAL_SHADOW_RGBA
 
 # WGS-84
 WGS84_A = 6378137.0
@@ -603,7 +600,7 @@ def adaptive_samples(elements, start, end, n_vertices, step_seconds=60, toleranc
 def shadow_window(elements):
     """The UTC (start, end) interval the umbral shadow is shown, or None if it misses Earth.
 
-    Cheap compared to umbral_shadow_packets, so track CZML can cover it in its clock without
+    Cheap compared to umbral_shadow_compact, so track CZML can cover it in its clock without
     generating the shadow.
     """
     interval = shadow_interval(elements)
@@ -619,63 +616,92 @@ def shadow_window(elements):
     return start, end
 
 
-def umbral_shadow_packets(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=UMBRAL_SHADOW_RGBA):
-    """CZML packets rendering the umbral shadow as a polygon whose vertices move over time,
-    and the UTC (start, end) interval the shadow is shown (see shadow_window).
+# Compact encoding of a polygon whose vertices are sampled over time ("sampled polygon"),
+# expanded into CZML in the browser by sampled_polygon.js. Plain CZML repeats every sample's
+# time for each vertex and carries a height that's always 0; this stores the times once and
+# each vertex's longitudes/latitudes as integer deltas, about a third of the size (and
+# compressing better). Lossless relative to the CZML it replaces: times are kept to the
+# millisecond and coordinates to 1e-4 degrees (~11 m).
+SAMPLED_POLYGON_FORMAT = "eclipsetracks.sampled_polygon"
+SAMPLED_POLYGON_VERSION = 1
+TIME_SCALE = 1000  # integer times are milliseconds after the epoch
+COORD_SCALE = 10000  # integer coordinates are 1e-4 degrees
 
-    Each vertex is a position-only packet with time-sampled positions; the polygon refers to
-    those positions, so Cesium interpolates every vertex between samples. Samples are
-    adaptive (see adaptive_samples) and interpolated linearly.
+
+def _deltas(values):
+    return [b - a for a, b in zip([0] + values, values)]
+
+
+def _undeltas(deltas):
+    out, total = [], 0
+    for d in deltas:
+        total += d
+        out.append(total)
+    return out
+
+
+def umbral_shadow_compact(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=UMBRAL_SHADOW_RGBA):
+    """The umbral shadow as a compact sampled polygon (a JSON-serializable dict), and the UTC
+    (start, end) interval it's shown (see shadow_window); (None, None) if it misses Earth.
+
+    Expanded (see expand_sampled_polygon), each vertex is a position-only packet with
+    time-sampled positions, and the polygon refers to those positions, so Cesium interpolates
+    every vertex between samples. Samples are adaptive (see adaptive_samples) and
+    interpolated linearly.
     """
     window = shadow_window(elements)
     if window is None:
-        return [], None
+        return None, None
     start, end = window
     samples = adaptive_samples(elements, start, end, n_vertices, tolerance_km=tolerance_km)
 
-    epoch = start
-    vertex_samples = [[] for _ in range(n_vertices)]
-    for t, outline in samples:
-        sec = round((t - epoch).total_seconds(), 3)
-        for i, (lon, lat) in enumerate(outline):
-            vertex_samples[i] += [sec, round(lon, 4), round(lat, 4), 0.0]
-
-    availability = TimeInterval(start=_isotime(start), end=_isotime(end))
-    vertex_ids = ["umbral_shadow_vertex_%02d_%s" % (i, iso) for i in range(n_vertices)]
-    packets = [
-        Packet(
-            id=vertex_id,
-            availability=availability,
-            position=Position(
-                epoch=_isotime(epoch),
-                cartographicDegrees=vertex_samples[i],
-                interpolationAlgorithm="LINEAR",
-            ),
-        )
-        for i, vertex_id in enumerate(vertex_ids)
-    ]
-    packets.append(
-        Packet(
-            id="umbral_shadow_%s" % iso,
-            availability=availability,
-            polygon=Polygon(
-                show=True,
-                material=Material(solidColor=solid(rgba)),
-                positions=PositionList(references=[v + "#position" for v in vertex_ids]),
-            ),
-        )
-    )
-    return packets, (start, end)
+    times = [round((t - start).total_seconds() * TIME_SCALE) for t, _ in samples]
+    if any(b <= a for a, b in zip(times, times[1:])):
+        raise ValueError("Shadow sample times are not strictly increasing at millisecond precision")
+    lons = [[round(outline[i][0] * COORD_SCALE) for _, outline in samples] for i in range(n_vertices)]
+    lats = [[round(outline[i][1] * COORD_SCALE) for _, outline in samples] for i in range(n_vertices)]
+    return {
+        "format": SAMPLED_POLYGON_FORMAT,
+        "version": SAMPLED_POLYGON_VERSION,
+        "id": "umbral_shadow_%s" % iso,
+        "name": "EclipseTracks.org %s umbral shadow" % iso,
+        "vertex_id": "umbral_shadow_vertex_{i}_%s" % iso,  # {i} is the 2+ digit vertex index
+        "availability": "%s/%s" % (_isotime(start), _isotime(end)),
+        "epoch": _isotime(start),
+        "rgba": list(rgba),
+        "time_scale": TIME_SCALE,
+        "coord_scale": COORD_SCALE,
+        "times": _deltas(times),
+        "lon": [_deltas(v) for v in lons],
+        "lat": [_deltas(v) for v in lats],
+    }, (start, end)
 
 
-def umbral_shadow_czml(iso, elements, **kwargs):
-    """A standalone CZML document for the umbral shadow, loaded alongside the track's CZML.
-
-    It has no clock: the track's document sets the clock, covering shadow_window. Returns
-    (document, window), or (None, None) if the shadow misses Earth.
-    """
-    packets, window = umbral_shadow_packets(iso, elements, **kwargs)
-    if not packets:
-        return None, None
-    document = Packet(id="document", version=CZML_VERSION, name="EclipseTracks.org %s umbral shadow" % iso)
-    return Document(packets=[document] + packets), window
+def expand_sampled_polygon(compact):
+    """CZML packets (a list of dicts, starting with the document packet, which has no clock)
+    for a compact sampled polygon. Reference implementation of sampled_polygon.js."""
+    if compact.get("format") != SAMPLED_POLYGON_FORMAT or compact.get("version") != SAMPLED_POLYGON_VERSION:
+        raise ValueError("Not a version %d sampled polygon" % SAMPLED_POLYGON_VERSION)
+    times = [t / compact["time_scale"] for t in _undeltas(compact["times"])]
+    scale = compact["coord_scale"]
+    packets = [{"id": "document", "version": CZML_VERSION, "name": compact["name"]}]
+    refs = []
+    for i, (lon_deltas, lat_deltas) in enumerate(zip(compact["lon"], compact["lat"])):
+        vertex_id = compact["vertex_id"].replace("{i}", "%02d" % i)
+        samples = []
+        for t, lon, lat in zip(times, _undeltas(lon_deltas), _undeltas(lat_deltas)):
+            samples += [t, lon / scale, lat / scale, 0]
+        packets.append({
+            "id": vertex_id,
+            "availability": compact["availability"],
+            "position": {"epoch": compact["epoch"], "cartographicDegrees": samples,
+                         "interpolationAlgorithm": "LINEAR"},
+        })
+        refs.append(vertex_id + "#position")
+    packets.append({
+        "id": compact["id"],
+        "availability": compact["availability"],
+        "polygon": {"show": True, "material": {"solidColor": {"color": {"rgba": compact["rgba"]}}},
+                    "positions": {"references": refs}},
+    })
+    return packets

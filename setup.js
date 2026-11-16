@@ -1,7 +1,7 @@
 "use strict";
 
 // Cache-busting key for data files, stamped by `npm run build`
-const cacheKey = "2026-11-16T09:07:15";
+const cacheKey = "2026-11-16T11:06:18";
 
 // Define API key
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZTg5YWQ4MC1lYjRiLTQ5MTItODZmYS01MTUzMzI0ODc5NDMiLCJpZCI6MTkzNTA3LCJpYXQiOjE3MDY4NDk3MzR9.TRMsdXhzoDwuo6OGLTF0JdJA0aOePU52H-mKy0ZgihI";
@@ -94,7 +94,7 @@ var eclipses = {
                     var iso   = date.toISOString().substr(0,10);
                     var event = { iso: iso, date: date, url: parts[1], region_string: '',
                                   umbral_track_path: 'czml/' + iso + '.umbral_track.czml?r=' + cacheKey,
-                                  umbral_shadow_path: 'czml/' + iso + '.umbral_shadow.czml?r=' + cacheKey,
+                                  umbral_shadow_path: 'czml/' + iso + '.umbral_shadow.json?r=' + cacheKey,
                                   json_path: 'czml/' + iso + '.json?r=' + cacheKey };
 
                     // Store events in an associative array with an iso index for walking
@@ -203,8 +203,9 @@ var eclipses = {
         this.selected_iso = iso;
 
         // Load the umbral track CZML into the viewer and set viewer camera/clock from hash if
-        // necessary. The umbral shadow (if any) is a separate, much larger CZML document
-        // loaded independently, so the track can appear first on slow connections.
+        // necessary. The umbral shadow (if any) is a separate, much larger compact document
+        // (see sampled_polygon.js) loaded independently, so the track can appear first on
+        // slow connections.
         var trackDataSource = new Cesium.CzmlDataSource();
         trackDataSource.load(eclipse.umbral_track_path).then(function() {
             // Ignore loads that finish after the user has moved on to another event
@@ -229,7 +230,13 @@ var eclipses = {
         viewer.dataSources.add(trackDataSource);
         if (eclipse.has_umbral_shadow) {
             var shadowDataSource = new Cesium.CzmlDataSource();
-            shadowDataSource.load(eclipse.umbral_shadow_path).catch(function(err) {
+            fetch(eclipse.umbral_shadow_path).then(function(response) {
+                if (!response.ok) { throw new Error(response.url + ": " + response.status); }
+                return response.json();
+            }).then(function(compact) {
+                if (eclipses.selected_iso != iso) { return; }
+                return shadowDataSource.load(expandSampledPolygon(compact));
+            }).catch(function(err) {
                 console.warn("Unable to load umbral shadow for " + iso + ": " + err);
             });
             viewer.dataSources.add(shadowDataSource);

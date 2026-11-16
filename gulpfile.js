@@ -4,7 +4,7 @@ const concat = require('gulp-concat');
 const terser = require('gulp-terser');
 
 // App-specific JS files to be watched and minified
-const appJsFiles = ['./setup.js'];
+const appJsFiles = ['./sampled_polygon.js', './setup.js'];
 
 // Vendor libraries come from node_modules and are bundled into vendor.min.js.
 // Cesium is too large to bundle/commit, so it's served from Cesium's CDN at the
