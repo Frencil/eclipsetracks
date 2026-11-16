@@ -1,5 +1,6 @@
 import json
 import unittest
+from unittest import mock
 from datetime import date
 from pathlib import Path
 
@@ -156,8 +157,11 @@ Universal  Northern Limit      Southern Limit       Central Line     Diam.  Sun 
 
 class CommandLineTestCase(unittest.TestCase):
 
-    # Run the CLI end to end against a temporary czml dir using a pre-seeded page cache
-    def test_main(self):
+    # Run the CLI end to end against a temporary czml dir using a pre-seeded page cache. Tests
+    # that aren't about shadows switch them off (there's no 2015-03-20 elements fixture), so
+    # they don't depend on which events has_umbral_shadow() selects
+    @mock.patch('eclipsescraper.cli.has_umbral_shadow', return_value=False)
+    def test_main(self, _has_umbral_shadow):
         import tempfile
         url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
         with tempfile.TemporaryDirectory() as tmp:
@@ -196,7 +200,8 @@ class CommandLineTestCase(unittest.TestCase):
 
     # Generating a subset of events updates their entries in events.json and keeps the rest,
     # in events.txt order; the bad flag comes from events.txt and unlisted events are dropped
-    def test_events_index_merge(self):
+    @mock.patch('eclipsescraper.cli.has_umbral_shadow', return_value=False)
+    def test_events_index_merge(self, _has_umbral_shadow):
         import tempfile
         url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
         with tempfile.TemporaryDirectory() as tmp:
@@ -219,10 +224,26 @@ class CommandLineTestCase(unittest.TestCase):
             self.assertTrue(index[0]['bad'])
             self.assertEqual(index[1], {'iso': '2016-03-09', 'type': 'total', 'umbral_shadow': False})
 
+    # An event selected for a shadow fails without Besselian elements rather than silently
+    # getting no shadow (and keeps any existing index entry)
+    @mock.patch('eclipsescraper.cli.has_umbral_shadow', return_value=True)
+    def test_shadow_requires_elements(self, _has_umbral_shadow):
+        import tempfile
+        url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            seed_cache(tmp / 'cache', url, read_fixture('SE2015Mar20Tpath.html'))
+            (tmp / 'events.txt').write_text('2015-03-20,%s\n' % url)
+            (tmp / 'events.json').write_text(json.dumps([{'iso': '2015-03-20', 'type': 'total', 'umbral_shadow': True}]))
+            self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
+                                   '--elements-file', str(tmp / 'elements.json'), 'czml']), 1)
+            self.assertFalse((tmp / '2015-03-20.umbral_track.czml').exists())
+            self.assertEqual(json.loads((tmp / 'events.json').read_text()),
+                             [{'iso': '2015-03-20', 'type': 'total', 'umbral_shadow': True}])
+
     # elements and czml never touch the network: an uncached page is an error, not a download
     def test_generation_is_offline(self):
         import tempfile
-        from unittest import mock
         url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
         with tempfile.TemporaryDirectory() as tmp, \
                 mock.patch('urllib.request.urlopen', side_effect=AssertionError('network used')):
@@ -236,7 +257,6 @@ class CommandLineTestCase(unittest.TestCase):
     # fetch downloads only what isn't cached (unless --refresh), into URL-mirroring paths
     def test_fetch(self):
         import tempfile
-        from unittest import mock
         from eclipsescraper.common import cache_path
         url = 'http://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
         beselm = 'https://eclipse.gsfc.nasa.gov/SEbeselm/SEbeselm2001/SE2015Mar20Tbeselm.html'

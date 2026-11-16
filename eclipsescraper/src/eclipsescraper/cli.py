@@ -18,10 +18,10 @@ from .common import DEFAULT_CACHE_DIR, DEFAULT_CZML_DIR, DEFAULT_ELEMENTS_FILE, 
 from .shadow import shadow_window, umbral_shadow_compact
 from .track import EclipseTrack
 
-# Events that get the Besselian-modeled umbral shadow. Pilot: all events in the 2020s;
-# widen to all events once the rendering approach is settled.
+# Events that get the Besselian-modeled umbral shadow.
 def has_umbral_shadow(iso):
-    return "2020" <= iso[:4] <= "2029"
+    # return "2020" <= iso[:4] <= "2029"
+    return True
 
 
 # Per-event output files in the czml directory. Each component is its own CZML document so
