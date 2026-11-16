@@ -1,16 +1,23 @@
-#!/usr/bin/python
+"""Scrape eclipse track data from NASA and generate EclipseTracks.org CZML/JSON.
 
-# Scrape eclipse track data from NASA
-# http://eclipse.gsfc.nasa.gov/eclipse.html
-# Eclipse Predictions by Fred Espenak, NASA's GSFC
+Source: https://eclipse.gsfc.nasa.gov/solar.html
+Eclipse Predictions by Fred Espenak, NASA's GSFC
+"""
 
-import re, math, json, csv, datetime, traceback
-from geopy.distance import geodesic
-
+import argparse
+import csv
+import datetime
+import hashlib
+import json
+import math
+import re
+import sys
+import time as time_module
+import traceback
 import urllib.request
+from pathlib import Path
 
-from czml3 import Document, Packet, Preamble
-
+from czml3 import Document, Packet
 from czml3.properties import (
     Clock,
     Color,
@@ -18,16 +25,43 @@ from czml3.properties import (
     Material,
     Polygon,
     Polyline,
+    PolylineMaterial,
+    Position,
     PositionList,
     SolidColorMaterial,
 )
+from czml3.types import IntervalValue, NumberValue
+from geopy.distance import geodesic
 
-from czml3.types import IntervalValue
+CZML_VERSION = "1.1"
 
-VERSION="1.1"
+# Repo layout: eclipsetracks/eclipsescraper/src/eclipsescraper.py -> eclipsetracks/czml
+DEFAULT_CZML_DIR = Path(__file__).resolve().parents[2] / "czml"
+DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[1] / ".cache"
 
-def addition(a, b):  
-    return a + b  
+USER_AGENT = "eclipsescraper (+https://github.com/Frencil/eclipsetracks)"
+
+
+def fetch_url(url, cache_dir=None, delay=0.0):
+    """Fetch a URL as text, optionally via an on-disk cache keyed by URL."""
+    cache_file = None
+    if cache_dir is not None:
+        cache_dir = Path(cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / (hashlib.sha1(url.encode()).hexdigest() + ".html")
+        if cache_file.exists():
+            return cache_file.read_text(encoding="utf-8")
+    if delay:
+        time_module.sleep(delay)
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        if r.status != 200:
+            raise Exception("Unable to load URL: %s (HTTP %s)" % (url, r.status))
+        text = r.read().decode("utf-8", "ignore")
+    if cache_file is not None:
+        cache_file.write_text(text, encoding="utf-8")
+    return text
+
 
 class EclipseTrack:
 
@@ -36,7 +70,6 @@ class EclipseTrack:
                    'sun_altitude', 'sun_azimuth',
                    'path_width', 'central_line_duration')
 
-    # Start by taking a raw data string and parsing it build the waypoints list
     def __init__(self, date):
 
         self.date = date
@@ -54,32 +87,22 @@ class EclipseTrack:
         self.limits = { 'north': [], 'south': [], 'central': [], 'ms_diam_ratio': [],
                         'sun_altitude': [], 'sun_azimuth': [], 'path_width': [], 'central_line_duration': [] }
 
-    def loadFromURL(self, url):
-        self.url = url
-        iso = self.date.isoformat()
-
-        # Extract eclipse type from URL
-        annular = re.search(r"Apath\.html$",self.url)
-        hybrid = re.search(r"Hpath\.html$",self.url)
-        total = re.search(r"Tpath\.html$",self.url)
-        if annular:
+    def setTypeFromURL(self, url):
+        if re.search(r"Apath\.html$", url):
             self.type = 'annular'
-        elif hybrid:
+        elif re.search(r"Hpath\.html$", url):
             self.type = 'hybrid'
-        elif total:
+        elif re.search(r"Tpath\.html$", url):
             self.type = 'total'
 
-        r = urllib.request.urlopen(self.url)
-        if r.status != 200:
-            raise Exception('Unable to load eclipse event: ' + iso + ' (URL: ' + self.url + ')')
-        else:
-            html = r.read().decode('utf-8','ignore')
-        
-        self.loadFromRawHTML(html)
+    def loadFromURL(self, url, cache_dir=None, delay=0.0):
+        self.url = url
+        self.setTypeFromURL(url)
+        self.loadFromRawHTML(fetch_url(url, cache_dir=cache_dir, delay=delay))
 
     def loadFromRawHTML(self, rawhtml):
-        p1 = rawhtml.partition('<pre>');
-        p2 = p1[2].partition('</pre>');
+        p1 = rawhtml.partition('<pre>')
+        p2 = p1[2].partition('</pre>')
         html = p2[0].strip()
         if len(html) == 0:
             raise Exception('raw data string not found between <pre> tags')
@@ -87,7 +110,7 @@ class EclipseTrack:
             self.parseHTML(html)
 
     def parseHTML(self, html):
-        allrows = re.sub(r'\r',r'\n',html).split('\n')
+        allrows = re.sub(r'\r', r'\n', html).split('\n')
         first_limits = False
         for row in allrows:
             if "Limits" in row:
@@ -95,7 +118,7 @@ class EclipseTrack:
             if first_limits and len(self.limits['north']) < 2:
                 row_stripped = row.strip()
                 if len(row_stripped) > 0:
-                    row_split = self.preparseHyphens(re.split('\s+',row_stripped))
+                    row_split = self.preparseHyphens(re.split(r'\s+', row_stripped))
                     self.parse_row(row_split)
 
     def __str__(self):
@@ -144,7 +167,7 @@ class EclipseTrack:
     def parse_row(self, row):
 
         parsed_row = []
-        
+
         def get(column, row):
             def func_not_found(row):
                 return None
@@ -152,33 +175,33 @@ class EclipseTrack:
                 func = getattr(self,column,func_not_found)
                 return func(row)
             except IndexError:
-                return None            
-        
+                return None
+
         for column in self.columns:
             val = get(column, row)
             parsed_row.append(val)
 
-        if (parsed_row[0] == None):
-            return None;
+        if parsed_row[0] is None:
+            return None
+
+        time = parsed_row[0]
+        if (parsed_row[1] is not None) and (parsed_row[2] is not None):
+            north = (parsed_row[2], parsed_row[1])
         else:
-            time = parsed_row[0]
-            if (parsed_row[1] != None) and (parsed_row[2] != None):
-                north = (parsed_row[2], parsed_row[1])
-            else:
-                north = None
-            if (parsed_row[3] != None) and (parsed_row[4] != None):
-                south = (parsed_row[4], parsed_row[3])
-            else:
-                south = None
-            if (parsed_row[5] != None) and (parsed_row[6] != None):        
-                central = (parsed_row[6], parsed_row[5])
-            else:
-                central = None
-            ms_diam_ratio = parsed_row[7]
-            sun_altitude = parsed_row[8]
-            sun_azimuth = parsed_row[9]
-            path_width = parsed_row[10]
-            central_line_duration = parsed_row[11]
+            north = None
+        if (parsed_row[3] is not None) and (parsed_row[4] is not None):
+            south = (parsed_row[4], parsed_row[3])
+        else:
+            south = None
+        if (parsed_row[5] is not None) and (parsed_row[6] is not None):
+            central = (parsed_row[6], parsed_row[5])
+        else:
+            central = None
+        ms_diam_ratio = parsed_row[7]
+        sun_altitude = parsed_row[8]
+        sun_azimuth = parsed_row[9]
+        path_width = parsed_row[10]
+        central_line_duration = parsed_row[11]
 
         if (time == 'Limits'):
             self.limits['north'].append(north)
@@ -190,7 +213,7 @@ class EclipseTrack:
             self.limits['path_width'].append(path_width)
             self.limits['central_line_duration'].append(central_line_duration)
         else:
-            if north != None and central != None and south != None:
+            if north is not None and central is not None and south is not None:
                 self.time.append(time)
                 self.position['north'].append(north)
                 self.position['south'].append(south)
@@ -217,7 +240,7 @@ class EclipseTrack:
 
     def SouthLimitLat(self, row):
         return self.parseLatLon(row[5],row[6])
-    
+
     def SouthLimitLon(self, row):
         return self.parseLatLon(row[7],row[8])
 
@@ -229,34 +252,46 @@ class EclipseTrack:
 
     def MSDiamRatio(self, row):
         try:
-            val = float(row[13])
-            return val
+            return float(row[13])
         except ValueError:
             return None
 
     def SunAltitude(self, row):
         try:
-            val = float(row[14])
-            return val
+            return float(row[14])
         except ValueError:
             return None
 
     def SunAzimuth(self, row):
         try:
-            val = float(row[15])
-            return val
+            return float(row[15])
         except ValueError:
             return None
 
     def PathWidth(self, row):
         try:
-            val = float(row[16])
-            return val
+            return float(row[16])
         except ValueError:
             return None
 
     def CentralLineDuration(self, row):
         return row[17]
+
+    # Resolve each tabulated HH:MM time to a full UTC datetime.
+    # The event date is the date of greatest eclipse, but a track can cross 00:00 UT, in
+    # which case the HH:MM values wrap. Greatest eclipse is approximated as the row with
+    # the highest sun altitude; rows on the far side of the wrap from it shift by a day.
+    def datetimes(self):
+        minutes = [int(t[0:2]) * 60 + int(t[3:5]) for t in self.time]
+        day = [0] * len(minutes)
+        for i in range(1, len(minutes)):
+            day[i] = day[i-1] + (1 if minutes[i] < minutes[i-1] else 0)
+        if day and day[-1] > 0:
+            altitudes = [a if a is not None else -1 for a in self.sun_altitude]
+            greatest = altitudes.index(max(altitudes))
+            day = [d - day[greatest] for d in day]
+        midnight = datetime.datetime.combine(self.date, datetime.time(0, 0), tzinfo=datetime.timezone.utc)
+        return [midnight + datetime.timedelta(days=d, minutes=m) for d, m in zip(day, minutes)]
 
     # Generate a point 10km above the center of the track for positioning a camera
     def getCameraPosition(self):
@@ -300,7 +335,7 @@ class EclipseTrack:
                     in_lon = region_range[2] < position[0] < region_range[3]
                 if in_lat and in_lon:
                     in_region = True
-                    break;
+                    break
             if in_region:
                 active_regions.append(region)
         return sorted(active_regions)
@@ -318,30 +353,19 @@ class EclipseTrack:
     def czml(self):
 
         iso = self.date.isoformat()
+        datetimes = self.datetimes()
+        epoch = datetimes[0]
+        seconds = [round((d - epoch).total_seconds()) for d in datetimes]
 
-        # Initialize document with clock
-        start = iso + "T" + self.time[0] + ":00Z"
-        end = iso + "T" + self.time[-1] + ":00Z"
+        def isotime(d):
+            return d.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        doc = [];
-        doc.append(
-            Preamble(
-                version=VERSION,
-                name="EclipseTracks.org %s" % (iso),
-                clock=IntervalValue(
-                    start=start,
-                    end=end,
-                    value=Clock(
-                        currentTime=start,
-                        multiplier=300,
-                        range="LOOP_STOP",
-                        step="SYSTEM_CLOCK_MULTIPLIER"
-                    )
-                )
-            )
-        )
+        start = isotime(datetimes[0])
+        end = isotime(datetimes[-1])
 
-        # TODO: Extract as function
+        def solid(rgba):
+            return SolidColorMaterial(color=Color(rgba=rgba))
+
         # Generate time-specific lists for various objects
         central_polyline_degrees = []
         north_polyline_degrees = []
@@ -353,30 +377,21 @@ class EclipseTrack:
 
         for t in range(len(self.time)):
 
-            time = iso + "T" + self.time[t] + ":00Z"
+            sec = seconds[t]
 
             # Define polyline waypoints only where data exist
-            if self.position['north'][t] != None:
+            if self.position['north'][t] is not None:
                 north_polyline_degrees += [self.position['north'][t][0], self.position['north'][t][1], 0.0]
-            if self.position['central'][t] != None:
+            if self.position['central'][t] is not None:
                 central_polyline_degrees += [self.position['central'][t][0], self.position['central'][t][1], 0.0]
-            if self.position['south'][t] != None:
+            if self.position['south'][t] is not None:
                 south_polyline_degrees += [self.position['south'][t][0], self.position['south'][t][1], 0.0]
 
             # Define ellipse positions and attributes for every time in the interval, using limits where necessary
             use_limit = min(int(math.floor(t/(len(self.time)/2))),1)
-            if self.position['north'][t] == None:
-                north = self.limits['north'][use_limit]
-            else:
-                north = self.position['north'][t]
-            if self.position['central'][t] == None:
-                central = self.limits['central'][use_limit]
-            else:
-                central = self.position['central'][t]
-            if self.position['south'][t] == None:
-                south = self.limits['south'][use_limit]
-            else:
-                south = self.position['south'][t]
+            north = self.position['north'][t] or self.limits['north'][use_limit]
+            central = self.position['central'][t] or self.limits['central'][use_limit]
+            south = self.position['south'][t] or self.limits['south'][use_limit]
 
             # Approximate ellipse semiMajorAxis from geodesic distance between limit polylines
             north2 = (north[1], north[0])
@@ -387,154 +402,145 @@ class EclipseTrack:
             ellipse_axis_ratio = self.sun_altitude[t] / 90
             semi_minor_axis = semi_major_axis * ellipse_axis_ratio
 
-            # Approximate ellipse rotation using basic spheroid (TODO: replace with WGS-84)
+            # Approximate ellipse rotation using basic spheroid
             # Calculate bearing in both directions and average them
-            nlat = north[1]/180 * math.pi;
-            nlon = north[0]/180 * math.pi;
-            clat = central[1]/180 * math.pi;
-            clon = central[0]/180 * math.pi;
-            slat = south[1]/180 * math.pi;
-            slon = south[0]/180 * math.pi;
+            nlat = north[1]/180 * math.pi
+            nlon = north[0]/180 * math.pi
+            slat = south[1]/180 * math.pi
+            slon = south[0]/180 * math.pi
 
-            y = math.sin(slon-nlon) * math.cos(slat);
-            x = math.cos(nlat) * math.sin(slat) - math.sin(nlat) * math.cos(slat) * math.cos(slon-nlon);
+            y = math.sin(slon-nlon) * math.cos(slat)
+            x = math.cos(nlat) * math.sin(slat) - math.sin(nlat) * math.cos(slat) * math.cos(slon-nlon)
             initial_bearing = math.atan2(y, x)
             if (initial_bearing < 0):
                 initial_bearing += math.pi * 2
 
-            y = math.sin(nlon-slon) * math.cos(nlat);
-            x = math.cos(slat) * math.sin(nlat) - math.sin(slat) * math.cos(nlat) * math.cos(nlon-slon);
+            y = math.sin(nlon-slon) * math.cos(nlat)
+            x = math.cos(slat) * math.sin(nlat) - math.sin(slat) * math.cos(nlat) * math.cos(nlon-slon)
             final_bearing = math.atan2(y, x) - math.pi
             if (final_bearing < 0):
                 final_bearing += math.pi * 2
 
             rotation = -1 * ((initial_bearing + final_bearing) / 2 - (math.pi / 2))
 
-            ellipse_position += [time, central[0], central[1], 0.0]
-            ellipse_semiMajorAxis += [time, round(semi_major_axis, 3)]
-            ellipse_semiMinorAxis += [time, round(semi_minor_axis, 3)]
-            ellipse_rotation += [time, round(rotation, 3)]
-
+            ellipse_position += [sec, central[0], central[1], 0.0]
+            ellipse_semiMajorAxis += [sec, round(semi_major_axis, 3)]
+            ellipse_semiMinorAxis += [sec, round(semi_minor_axis, 3)]
+            ellipse_rotation += [sec, round(rotation, 3)]
 
         # Generate a list of positions representing the track as an enclosed polygon
         track_polygon_positions = list(north_polyline_degrees)
-        point = round(len(south_polyline_degrees)/3)
-        while (point > 0):
-            offset = (point-1) * 3
-            track_polygon_positions += [
-                south_polyline_degrees[offset],
-                south_polyline_degrees[offset+1],
-                south_polyline_degrees[offset+2],
-            ]
-            point -= 1
+        for offset in range(len(south_polyline_degrees) - 3, -1, -3):
+            track_polygon_positions += south_polyline_degrees[offset:offset+3]
 
-        # Render track as polygon fill with polylines for north, central, and south
-        doc.append(
+        packets = [
+            Packet(
+                id="document",
+                version=CZML_VERSION,
+                name="EclipseTracks.org %s" % (iso),
+                clock=IntervalValue(
+                    start=start,
+                    end=end,
+                    value=Clock(
+                        currentTime=start,
+                        multiplier=300,
+                        range="LOOP_STOP",
+                        step="SYSTEM_CLOCK_MULTIPLIER",
+                    ),
+                ),
+            ),
+            # Render track as polygon fill with polylines for north, central, and south
             Packet(
                 id="track_length_fill_%s" % (iso),
                 polygon=Polygon(
                     show=True,
-                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(0, 0, 0, 90)))),
+                    material=Material(solidColor=solid([0, 0, 0, 90])),
                     positions=PositionList(cartographicDegrees=track_polygon_positions),
+                ),
+            ),
+        ]
+        for line_id, degrees, rgba in (
+            ("track_north_line", north_polyline_degrees, [232, 72, 68, 255]),
+            ("track_central_line", central_polyline_degrees, [241, 226, 57, 255]),
+            ("track_south_line", south_polyline_degrees, [232, 72, 68, 255]),
+        ):
+            packets.append(
+                Packet(
+                    id="%s_%s" % (line_id, iso),
+                    polyline=Polyline(
+                        show=True,
+                        clampToGround=True,
+                        width=2,
+                        material=PolylineMaterial(solidColor=solid(rgba)),
+                        positions=PositionList(cartographicDegrees=degrees),
+                    ),
                 )
             )
-        )
-        doc.append(
-            Packet(
-                id="track_north_line_%s" % (iso),
-                polyline=Polyline(
-                    show=True,
-                    clampToGround=True,
-                    width=2,
-                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(232, 72, 68, 255)))),
-                    positions=PositionList(cartographicDegrees=north_polyline_degrees),
-                )
-            )
-        )
-        doc.append(
-            Packet(
-                id="track_central_line_%s" % (iso),
-                polyline=Polyline(
-                    show=True,
-                    clampToGround=True,
-                    width=2,
-                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(241, 226, 57, 255)))),
-                    positions=PositionList(cartographicDegrees=central_polyline_degrees),
-                )
-            )
-        )
-        doc.append(
-            Packet(
-                id="track_south_line_%s" % (iso),
-                polyline=Polyline(
-                    show=True,
-                    clampToGround=True,
-                    width=2,
-                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(232, 72, 68, 255)))),
-                    positions=PositionList(cartographicDegrees=south_polyline_degrees),
-                )
-            )
-        )
 
         # Render approximated umbral shadow as a moving ellipse
-        doc.append(
+        packets.append(
             Packet(
                 id="approximated_umbral_shadow_%s" % (iso),
-                position=PositionList(cartographicDegrees=ellipse_position),
+                position=Position(epoch=start, cartographicDegrees=ellipse_position),
                 ellipse=Ellipse(
                     show=True,
                     fill=True,
                     granularity=0.002,
-                    semiMajorAxis={ "number": ellipse_semiMajorAxis },
-                    semiMinorAxis={ "number": ellipse_semiMinorAxis },
-                    rotation={ "number": ellipse_rotation },
-                    material=Material(solidColor=SolidColorMaterial(color=Color(rgba=(0, 0, 0, 160)))),
-                )
+                    semiMajorAxis=NumberValue(epoch=start, number=ellipse_semiMajorAxis),
+                    semiMinorAxis=NumberValue(epoch=start, number=ellipse_semiMinorAxis),
+                    rotation=NumberValue(epoch=start, number=ellipse_rotation),
+                    material=Material(solidColor=solid([0, 0, 0, 160])),
+                ),
             )
         )
 
-        # Done!
-        return Document(doc)
+        return Document(packets=packets)
 
 
-# If called from command line then parse events.txt and scrape/generate CZML and JSON files
-if __name__ == "__main__":
-
-    czml_path = "../../czml/"
-    # LIMIT = 3
-    # INC = 0
-    with open(czml_path + "events.txt", "r") as events:
-
-        reader = csv.reader(events, delimiter=',')
-        for row in reader:
-
-            # INC += 1
-            # if INC > LIMIT or INC < 3:
-            #     continue
-
-            iso = row[0]
-            url = row[1]
-
-            try:
-
-                date = datetime.datetime.strptime(iso, "%Y-%m-%d").date()
-                track = EclipseTrack(date)
-                track.loadFromURL(url)
-                iso2 = track.date.strftime("%Y-%m-%d")
-
-                track_czml = track.czml()
-                czml_filename = czml_path + iso2 + ".czml"
-                with open(czml_filename, 'w') as outfile:
-                    track_czml.dump(outfile)
-                    print("Wrote " + czml_filename)
-
-                    track_json = track.json()
-                    json_filename = czml_path + iso2 + ".json"
-                    with open(json_filename, 'w') as outfile:
-                        json.dump(track_json, outfile)
-                        print("Wrote " + json_filename)
-
-            except Exception:
-                print("Error on ISO: " + iso)
-                traceback.print_exc()
+def read_events(events_file):
+    """Yield (iso, url, flags) for each row of events.txt."""
+    with open(events_file, newline="") as f:
+        for row in csv.reader(f):
+            if len(row) < 2 or not re.match(r"^\d{4}-\d{2}-\d{2}$", row[0]):
                 continue
+            yield row[0], row[1], row[2:]
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Scrape NASA eclipse path tables into EclipseTracks.org CZML/JSON files."
+    )
+    parser.add_argument("--czml-dir", type=Path, default=DEFAULT_CZML_DIR,
+                        help="Directory containing events.txt and receiving output (default: %(default)s)")
+    parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR,
+                        help="Cache for downloaded NASA pages (default: %(default)s)")
+    parser.add_argument("--no-cache", action="store_true", help="Always re-download NASA pages")
+    parser.add_argument("--delay", type=float, default=1.0,
+                        help="Seconds to wait before each uncached download (default: %(default)s)")
+    parser.add_argument("isos", nargs="*", help="Only process these event dates (YYYY-MM-DD)")
+    args = parser.parse_args(argv)
+
+    cache_dir = None if args.no_cache else args.cache_dir
+    errors = 0
+    for iso, url, _flags in read_events(args.czml_dir / "events.txt"):
+        if args.isos and iso not in args.isos:
+            continue
+        try:
+            date = datetime.date.fromisoformat(iso)
+            track = EclipseTrack(date)
+            track.loadFromURL(url, cache_dir=cache_dir, delay=args.delay)
+
+            czml_filename = args.czml_dir / (iso + ".czml")
+            czml_filename.write_text(track.czml().dumps())
+            json_filename = args.czml_dir / (iso + ".json")
+            json_filename.write_text(json.dumps(track.json()))
+            print("Wrote %s, %s" % (czml_filename.name, json_filename.name))
+        except Exception:
+            errors += 1
+            print("Error on ISO: " + iso, file=sys.stderr)
+            traceback.print_exc()
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

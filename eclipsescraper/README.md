@@ -1,28 +1,34 @@
 # EclipseScraper
 
-Scrape NASA's ecliupse website to generate EclipseTracks.org CZML and JSON files.
+Scrape NASA's eclipse website to generate the EclipseTracks.org CZML and JSON files in `../czml/`.
+
+Eclipse Predictions by Fred Espenak, NASA's GSFC: <https://eclipse.gsfc.nasa.gov/solar.html>
 
 ## Setup
 
-From `~/eclipsescraper`:
+Requires Python 3.10+ and [Poetry](https://python-poetry.org/) 2.x. From this directory:
 
 ```
-poetry shell
-poetry install --with dev
+poetry install
 ```
+
+This creates a virtualenv in `.venv/` (see `poetry.toml`) with the `eclipsescraper` command and the dev dependencies.
 
 ## Run the Scraper
 
-From `~/eclipsescraper/src`:
+```
+poetry run eclipsescraper              # regenerate every event in ../czml/events.txt
+poetry run eclipsescraper 2024-04-08   # regenerate only the given event(s)
+```
 
-```
-python eclipsescraper.py
-```
+Each event's path table is downloaded from the URL given in `events.txt` (`<iso date>,<url>[,bad]`; events flagged `bad` are still generated but hidden by the site). Downloads are cached in `.cache/` so reruns don't hit NASA again; pass `--no-cache` to force fresh downloads. See `poetry run eclipsescraper --help` for all options.
+
+After regenerating data, run `npm run build` from the repository root to update the cache key so browsers fetch the new files.
 
 ## Run Tests
 
-From `~/eclipsescraper`:
+```
+poetry run pytest
+```
 
-```
-pytest tests
-```
+Tests run against saved fixtures in `tests/fixtures/` and never touch the network.

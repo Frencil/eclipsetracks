@@ -1,7 +1,17 @@
+import json
 import unittest
 from datetime import date
+from pathlib import Path
 
-from eclipsescraper import EclipseTrack
+from eclipsescraper import EclipseTrack, main
+from .czml_normalize import normalize_czml
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+# NASA pages are Latin-1; decode the same way the scraper does
+def read_fixture(name):
+    return (FIXTURES / name).read_bytes().decode('utf-8', 'ignore')
 
 class BaseClassesTestCase(unittest.TestCase):
 
@@ -73,26 +83,21 @@ Universal  Northern Limit      Southern Limit       Central Line     Diam.  Sun 
         self.maxDiff = None
         self.assertEqual(test_track.data(), expected_track)
 
-    # To prevent excessive load on the actual eclipse site HTML should be presupplied for various types of events.
-    # Test loadFromURL once and only once with a test URL staged on eclipsetracks.org
-    def test_Scrape20150320_loadFromURL(self):
+    # Parse a full saved copy of the 2015-03-20 path page (no network access in tests)
+    def test_Scrape20150320_fixture(self):
 
-        test_date = date(2015, 3, 20)
-        test_track = EclipseTrack(test_date)
-        test_track.loadFromURL('http://eclipsetracks.org/test/eclipsescraper_test_SE2015Mar20Tpath.html')
-        test_czml = test_track.czml()
-        self.assertEqual(test_czml.dumps(), self.expected_czml['20150320'])
+        test_track = EclipseTrack(date(2015, 3, 20))
+        test_track.setTypeFromURL('https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html')
+        test_track.loadFromRawHTML(read_fixture('SE2015Mar20Tpath.html'))
 
-        test_camera_position = test_track.getCameraPosition()
-        self.assertEqual(test_camera_position, [-6.422, 64.568, 10000000.0])
+        self.assertEqual(test_track.getCameraPosition(), [-6.422, 64.568, 10000000.0])
+        self.assertEqual(test_track.json(), {'iso': '2015-03-20',
+                                             'type': 'total',
+                                             'regions': ['arctic', 'europe', 'north atlantic'],
+                                             'camera_position': [-6.422, 64.568, 10000000.0]})
+        self.assertEqual(normalize_czml(json.loads(test_track.czml().dumps())),
+                         normalize_czml(json.loads(self.expected_czml['20150320'])))
 
-        test_json = test_track.json()
-        self.assertEqual(test_json, {'iso': '2015-03-20',
-                                     'type': 'total',
-                                     'regions': ['arctic', 'europe', 'north atlantic'],
-                                     'camera_position': [-6.422, 64.568, 10000000.0]})
-
-    
     # Test the full scraping of the 2017-08-21 event (abbreviated).
     def test_Scrape20170821_loadFromRawHTML(self):
 
@@ -104,8 +109,8 @@ Universal  Northern Limit      Southern Limit       Central Line     Diam.  Sun 
         test_track.loadFromRawHTML(test_html)
         self.assertEqual(test_track.data(), self.expected_track['20170821'])
 
-        test_czml = test_track.czml()
-        self.assertEqual(test_czml.dumps(), self.expected_czml['20170821'])
+        self.assertEqual(normalize_czml(json.loads(test_track.czml().dumps())),
+                         normalize_czml(json.loads(self.expected_czml['20170821'])))
 
         test_camera_position = test_track.getCameraPosition()
         self.assertEqual(test_camera_position, [-37.658, 13.577, 10000000.0])
@@ -117,9 +122,48 @@ Universal  Northern Limit      Southern Limit       Central Line     Diam.  Sun 
                                      'camera_position': [-37.658, 13.577, 10000000.0]})
 
 
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(BaseClassesTestCase))
+    # Tracks that cross 00:00 UT must keep increasing timestamps, with the event date
+    # attached to the side of midnight containing greatest eclipse (max sun altitude)
+    def test_MidnightCrossing(self):
+
+        def row(t, alt):
+            return (" %s   41 29.7N 164 30.3W  41 25.2N 161 24.4W  41 29.2N 162 51.0W  1.018  %2d  80   70  01m01.6s\n"
+                    % (t, alt))
+        limits = " Limits  39 59.7N 171 44.9W  39 28.8N 171 26.0W  39 44.2N 171 35.4W  1.016   0   -   62  00m51.6s\n"
+
+        # Greatest eclipse before midnight: later rows roll over to the next day
+        track = EclipseTrack(date(2052, 9, 22))
+        track.loadFromRawHTML("<pre>" + limits + row("23:58", 60) + row("00:00", 50) + row("00:02", 40) + limits + "</pre>")
+        self.assertEqual([d.isoformat() for d in track.datetimes()],
+                         ['2052-09-22T23:58:00+00:00', '2052-09-23T00:00:00+00:00', '2052-09-23T00:02:00+00:00'])
+
+        # Greatest eclipse after midnight: earlier rows belong to the previous day
+        track = EclipseTrack(date(2052, 9, 22))
+        track.loadFromRawHTML("<pre>" + limits + row("23:58", 40) + row("00:00", 50) + row("00:02", 60) + limits + "</pre>")
+        self.assertEqual([d.isoformat() for d in track.datetimes()],
+                         ['2052-09-21T23:58:00+00:00', '2052-09-22T00:00:00+00:00', '2052-09-22T00:02:00+00:00'])
+
+        czml = json.loads(track.czml().dumps())
+        self.assertEqual(czml[0]['clock']['interval'], '2052-09-21T23:58:00Z/2052-09-22T00:02:00Z')
+        self.assertEqual(czml[-1]['position']['cartographicDegrees'][0::4], [0, 120, 240])
+
+
+class CommandLineTestCase(unittest.TestCase):
+
+    # Run the CLI end to end against a temporary czml dir using a pre-seeded page cache
+    def test_main(self):
+        import hashlib, tempfile
+        url = 'https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2015Mar20Tpath.html'
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / 'cache').mkdir()
+            (tmp / 'cache' / (hashlib.sha1(url.encode()).hexdigest() + '.html')).write_text(
+                read_fixture('SE2015Mar20Tpath.html'))
+            (tmp / 'events.txt').write_text('2015-03-20,%s\n' % url)
+            self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache')]), 0)
+            self.assertEqual(json.loads((tmp / '2015-03-20.json').read_text())['type'], 'total')
+            self.assertEqual(json.loads((tmp / '2015-03-20.czml').read_text())[0]['id'], 'document')
+
 
 if __name__ == '__main__':
     unittest.main()

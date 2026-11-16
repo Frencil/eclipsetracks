@@ -1,0 +1,4 @@
+# The scraper is a local build tool, not part of the website. Never serve or execute
+# anything in this directory. (Requires AllowOverride AuthConfig or All for this path;
+# alternatively put the equivalent <Directory> block in the vhost config.)
+Require all denied

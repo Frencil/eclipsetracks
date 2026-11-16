@@ -1,18 +1,29 @@
-[tool.poetry]
+[project]
 name = "eclipsescraper"
-version = "0.5.0"
-description = ""
-authors = ["Christoph Clark <frencils@gmail.com>"]
+version = "0.6.0"
+description = "Scrape NASA eclipse data into EclipseTracks.org CZML and JSON files"
+authors = [{ name = "Christoph Clark", email = "frencils@gmail.com" }]
 readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+    "czml3 (>=4.0.0,<5.0.0)",
+    "geopy (>=2.5.0,<3.0.0)",
+]
 
-[tool.poetry.dependencies]
-python = "^3.8"
-czml3 = "^0.7.0"
-geopy = "^2.4.1"
+[project.scripts]
+eclipsescraper = "eclipsescraper:main"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0.0"
+[dependency-groups]
+dev = ["pytest (>=9.0.0,<10.0.0)"]
+
+[tool.poetry]
+packages = [{ include = "eclipsescraper.py", from = "src" }]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning:dateutil.*"]
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

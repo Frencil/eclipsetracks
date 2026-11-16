@@ -1,0 +1,22 @@
+{
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/Frencil/eclipsetracks.git"
+  },
+  "scripts": {
+    "build": "gulp build",
+    "watch": "gulp",
+    "serve": "python3 -m http.server 8000"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "cesium": "^1.147.0",
+    "gulp": "^5.0.1",
+    "gulp-concat": "^2.6.1",
+    "gulp-terser": "^2.1.0",
+    "lz-string": "^1.5.0"
+  }
+}
