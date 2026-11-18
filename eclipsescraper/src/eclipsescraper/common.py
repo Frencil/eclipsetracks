@@ -26,6 +26,9 @@ TRACK_LIMIT_RGBA = [232, 72, 68, 255]
 TRACK_CENTRAL_RGBA = [241, 226, 57, 255]
 # Same black/alpha used by the original approximated umbral shadow ellipse
 UMBRAL_SHADOW_RGBA = [0, 0, 0, 160]
+# Same black, fainter: each of the penumbral shadow's nested polygons is drawn in it, so
+# they add up toward the umbra
+PENUMBRAL_SHADOW_RGBA = [0, 0, 0, 32]
 
 
 def solid(rgba):

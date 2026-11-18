@@ -1,7 +1,7 @@
 "use strict";
 
 // Cache-busting key for data files, stamped by `npm run build`
-const cacheKey = "2026-11-16T11:19:09";
+const cacheKey = "2026-11-18T01:56:32";
 
 // Define API key
 Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZTg5YWQ4MC1lYjRiLTQ5MTItODZmYS01MTUzMzI0ODc5NDMiLCJpZCI6MTkzNTA3LCJpYXQiOjE3MDY4NDk3MzR9.TRMsdXhzoDwuo6OGLTF0JdJA0aOePU52H-mKy0ZgihI";
@@ -43,6 +43,10 @@ var eclipses = {
     isos: new Array(),
     events: new Object(),
     selected_iso: null,
+
+    // Shadow components an event can have, by their events.json flag (and file name), in
+    // the order they're added to the viewer
+    shadow_components: ["penumbral_shadow", "umbral_shadow"],
 
     // Thanks for making me define this for you, Javascript. =/
     formatDate: function(date) {
@@ -88,9 +92,13 @@ var eclipses = {
                                   regions: json.regions,
                                   region_string: eclipses.formatRegionString(json.regions),
                                   camera_position: json.camera_position,
-                                  has_umbral_shadow: json.umbral_shadow === true,
                                   umbral_track_path: 'czml/' + iso + '.umbral_track.czml?r=' + cacheKey,
-                                  umbral_shadow_path: 'czml/' + iso + '.umbral_shadow.json?r=' + cacheKey };
+                                  // Shadow components (compact sampled polygons) this event has
+                                  shadows: eclipses.shadow_components.filter(function(name) {
+                                      return json[name] === true;
+                                  }).map(function(name) {
+                                      return { name: name, path: 'czml/' + iso + '.' + name + '.json?r=' + cacheKey };
+                                  }) };
 
                     // Store events in an associative array with an iso index for walking
                     eclipses.isos.push(iso);
@@ -178,9 +186,9 @@ var eclipses = {
         this.selected_iso = iso;
 
         // Load the umbral track CZML into the viewer and set viewer camera/clock from hash if
-        // necessary. The umbral shadow (if any) is a separate, much larger compact document
-        // (see sampled_polygon.js) loaded independently, so the track can appear first on
-        // slow connections.
+        // necessary. Each shadow (if any) is a separate, much larger compact document (see
+        // sampled_polygon.js) loaded independently, so the track can appear first on slow
+        // connections.
         var trackDataSource = new Cesium.CzmlDataSource();
         trackDataSource.load(eclipse.umbral_track_path).then(function() {
             // Ignore loads that finish after the user has moved on to another event
@@ -203,21 +211,21 @@ var eclipses = {
             }
         });
         viewer.dataSources.add(trackDataSource);
-        if (eclipse.has_umbral_shadow) {
+        eclipse.shadows.forEach(function(shadow) {
             var shadowDataSource = new Cesium.CzmlDataSource();
-            fetch(eclipse.umbral_shadow_path).then(function(response) {
+            fetch(shadow.path).then(function(response) {
                 if (!response.ok) { throw new Error(response.url + ": " + response.status); }
                 return response.json();
             }).then(function(compact) {
                 if (eclipses.selected_iso != iso) { return; }
                 return shadowDataSource.load(expandSampledPolygon(compact));
             }).catch(function(err) {
-                console.warn("Unable to load umbral shadow for " + iso + ": " + err);
+                console.warn("Unable to load " + shadow.name + " for " + iso + ": " + err);
             });
             viewer.dataSources.add(shadowDataSource);
-        }
+        });
         // The viewer's clock follows the most recently added data source, but only the umbral
-        // track document defines a clock (covering the whole shadow), so track that one
+        // track document defines a clock (covering every shadow), so track that one
         viewer.clockTrackedDataSource = trackDataSource;
 
         // Visually select/highlight everything

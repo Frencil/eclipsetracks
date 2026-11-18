@@ -1,4 +1,4 @@
-"""Model the Moon's umbral (or antumbral) shadow on the WGS-84 ellipsoid from Besselian elements.
+"""Model the Moon's umbral (or antumbral) and penumbral shadows on the WGS-84 ellipsoid from Besselian elements.
 
 Geometry
 --------
@@ -39,7 +39,7 @@ import datetime
 import math
 
 
-from .common import CZML_VERSION, UMBRAL_SHADOW_RGBA
+from .common import CZML_VERSION, PENUMBRAL_SHADOW_RGBA, UMBRAL_SHADOW_RGBA
 
 # WGS-84
 WGS84_A = 6378137.0
@@ -97,13 +97,42 @@ def ecef_to_geodetic(p):
     return lon, lat
 
 
+class Cone:
+    """A shadow cone: the umbra, or the contour of a given eclipse magnitude in the penumbra.
+
+    Eclipse magnitude is the fraction of the Sun's diameter the Moon covers. On the
+    fundamental plane a point at distance D from the shadow axis sees magnitude
+    m = (L1 - D) / (L1 + L2), so the contour of magnitude m is the circle of radius
+    L1 - m (L1 + L2). L1 and L2 are both linear in zeta, so that's a cone too, with
+    l = l1 - m (l1 + l2) and tan f = tan f1 - m (tan f1 + tan f2): magnitude 0 is the
+    penumbra's outer edge, and magnitude 1 the umbra (traversed from the opposite side).
+    """
+
+    def __init__(self, magnitude=None):
+        self.magnitude = magnitude  # None: the umbra
+
+    def at(self, v, elements):
+        """(l, tan f) given element values v."""
+        if self.magnitude is None:
+            return v["l2"], elements.tan_f2
+        m = self.magnitude
+        return v["l1"] - m * (v["l1"] + v["l2"]), elements.tan_f1 - m * (elements.tan_f1 + elements.tan_f2)
+
+    def __repr__(self):
+        return "Cone(%r)" % self.magnitude
+
+
+UMBRA = Cone()
+PENUMBRA = Cone(0.0)
+
+
 class ShadowSnapshot:
     """Shadow geometry at one instant."""
 
-    def __init__(self, elements, utc, umbra=True):
+    def __init__(self, elements, utc, cone=UMBRA):
         v = elements.at(utc)
         self.x, self.y = v["x"], v["y"]
-        self.l, self.tan_f = (v["l2"], elements.tan_f2) if umbra else (v["l1"], elements.tan_f1)
+        self.l, self.tan_f = cone.at(v, elements)
         self.xhat, self.yhat, self.zhat = fundamental_frame(v["d"], v["mu"])
         self._mz = _m(self.zhat)
         self._zmz = _dot(self.zhat, self._mz)
@@ -292,7 +321,7 @@ def _corner_directions(snap, cone_arc):
     return (phi_b, phi_a) if phi_a >= phi_b else (phi_a, phi_b)
 
 
-def _boundary_arcs(elements, utc, umbra=True):
+def _boundary_arcs(elements, utc, cone=UMBRA):
     """(snap, cone_arc, limb_arc) of the shadow at utc, or None if it's not on the Earth.
 
     cone_arc is the ordered list of (generator angle, ECEF point) where cone generators meet
@@ -301,7 +330,7 @@ def _boundary_arcs(elements, utc, umbra=True):
     (where it meets the limb) and limb_arc is the ordered list of ECEF limb points inside
     the cone from corner B back to corner A (possibly empty for a tiny shadow).
     """
-    snap = ShadowSnapshot(elements, utc, umbra)
+    snap = ShadowSnapshot(elements, utc, cone)
     cone, some_miss = _trace(snap.cone_point)
     if not cone:
         return None
@@ -329,11 +358,11 @@ def _dedupe(points, closed=True):
     return out
 
 
-def shadow_boundary(elements, utc, umbra=True):
+def shadow_boundary(elements, utc, cone=UMBRA):
     """Dense ordered boundary of the shadow on the Earth as (ECEF points in equatorial radii,
     centroid on the fundamental plane, ShadowSnapshot), or None if the shadow doesn't touch
     the Earth."""
-    arcs = _boundary_arcs(elements, utc, umbra)
+    arcs = _boundary_arcs(elements, utc, cone)
     if arcs is None:
         return None
     snap, cone_arc, limb_arc = arcs
@@ -444,7 +473,7 @@ def _place(points, measure, targets):
     return out
 
 
-def shadow_outline(elements, utc, n_vertices, umbra=True):
+def shadow_outline(elements, utc, n_vertices, cone=UMBRA):
     """The shadow outline as n_vertices (lon, lat) points, or None.
 
     Vertices are placed so that each moves continuously over time:
@@ -459,7 +488,7 @@ def shadow_outline(elements, utc, n_vertices, umbra=True):
     The switch between the two placements, when the shadow comes fully onto (or starts to
     leave) the sunlit Earth, reorders the vertices; that happens once at each end.
     """
-    arcs = _boundary_arcs(elements, utc, umbra)
+    arcs = _boundary_arcs(elements, utc, cone)
     if arcs is None:
         return None
     snap, cone_arc, limb_arc = arcs
@@ -538,9 +567,24 @@ def central_interval(elements):
     return _interval(lambda t: axis_point(elements, t) is not None, *elements.valid_utc())
 
 
-def shadow_interval(elements, umbra=True):
+# How far past their validity period the polynomial elements may be evaluated, for shadows
+# still on the Earth at either end of it. NASA fits each eclipse's elements over 6 hours,
+# which can fall a few minutes short of the penumbra's first/last contact (e.g. 2027-02-06);
+# extrapolated, the polynomials stay good to seconds there (2017-08-21's last penumbral
+# contact, 5.5 minutes past validity, comes out 5 s from NASA's).
+MAX_EXTRAPOLATION = datetime.timedelta(minutes=15)
+
+
+def shadow_interval(elements, cone=UMBRA):
     """UTC (start, end) during which any of the shadow touches the Earth."""
-    return _interval(lambda t: ShadowSnapshot(elements, t, umbra).touches_earth(), *elements.valid_utc())
+    def touches(t):
+        return ShadowSnapshot(elements, t, cone).touches_earth()
+    start, end = elements.valid_utc()
+    if touches(start):
+        start -= MAX_EXTRAPOLATION
+    if touches(end):
+        end += MAX_EXTRAPOLATION
+    return _interval(touches, start, end)
 
 
 def _isotime(dt):
@@ -554,7 +598,7 @@ def _ecef_km(lon, lat):
 
 
 def adaptive_samples(elements, start, end, n_vertices, step_seconds=60, tolerance_km=0.5,
-                     min_step_seconds=0.01):
+                     min_step_seconds=0.01, cone=UMBRA):
     """Sample the outline over [start, end] so that linearly interpolating every vertex
     between consecutive samples stays within tolerance_km of the true outline vertices
     (checked at each interval's midpoint).
@@ -565,7 +609,7 @@ def adaptive_samples(elements, start, end, n_vertices, step_seconds=60, toleranc
     Returns [(utc, [(lon, lat), ...]), ...] in time order.
     """
     def sample(t):
-        return t, shadow_outline(elements, t, n_vertices)
+        return t, shadow_outline(elements, t, n_vertices, cone)
 
     def error_km(a, b, mid):
         f = (mid[0] - a[0]) / (b[0] - a[0])
@@ -597,21 +641,22 @@ def adaptive_samples(elements, start, end, n_vertices, step_seconds=60, toleranc
     return samples + [coarse[-1]]
 
 
-def shadow_window(elements):
-    """The UTC (start, end) interval the umbral shadow is shown, or None if it misses Earth.
+def shadow_window(elements, cone=UMBRA):
+    """The UTC (start, end) interval the umbral (or penumbral) shadow is shown, or None if it
+    misses Earth.
 
-    Cheap compared to umbral_shadow_compact, so track CZML can cover it in its clock without
+    Cheap compared to generating the shadow, so track CZML can cover it in its clock without
     generating the shadow.
     """
-    interval = shadow_interval(elements)
+    interval = shadow_interval(elements, cone)
     if interval is None:
         return None
     # Start/end just inside first/last contact, where the shadow is a sliver rather than a point
     inset = datetime.timedelta(milliseconds=50)
     start, end = interval[0] + inset, interval[1] - inset
-    while shadow_boundary(elements, start) is None:
+    while shadow_boundary(elements, start, cone) is None:
         start += inset
-    while shadow_boundary(elements, end) is None:
+    while shadow_boundary(elements, end, cone) is None:
         end -= inset
     return start, end
 
@@ -623,7 +668,10 @@ def shadow_window(elements):
 # compressing better). Lossless relative to the CZML it replaces: times are kept to the
 # millisecond and coordinates to 1e-4 degrees (~11 m).
 SAMPLED_POLYGON_FORMAT = "eclipsetracks.sampled_polygon"
-SAMPLED_POLYGON_VERSION = 1
+# Version 1 is a single polygon, with its fields at the top level. Version 2 is a document
+# with a name and a list of polygons, each with the same fields as version 1 (plus an
+# optional name for the polygon itself). Any polygon may also have a granularity (radians).
+SAMPLED_POLYGON_VERSIONS = (1, 2)
 TIME_SCALE = 1000  # integer times are milliseconds after the epoch
 COORD_SCALE = 10000  # integer coordinates are 1e-4 degrees
 
@@ -640,20 +688,32 @@ def _undeltas(deltas):
     return out
 
 
-def umbral_shadow_compact(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=UMBRAL_SHADOW_RGBA):
-    """The umbral shadow as a compact sampled polygon (a JSON-serializable dict), and the UTC
-    (start, end) interval it's shown (see shadow_window); (None, None) if it misses Earth.
+# Interpolation tolerance by shadow. The penumbra is ~7000 km across, where 48 vertices
+# already put the outline up to ~10 km from the true boundary, and its edge is faint, so
+# a coarser tolerance than the umbra's suffices (and makes its file about half the size).
+UMBRAL_TOLERANCE_KM = 0.5
+PENUMBRAL_TOLERANCE_KM = 5.0
 
-    Expanded (see expand_sampled_polygon), each vertex is a position-only packet with
-    time-sampled positions, and the polygon refers to those positions, so Cesium interpolates
-    every vertex between samples. Samples are adaptive (see adaptive_samples) and
-    interpolated linearly.
-    """
-    window = shadow_window(elements)
+# Eclipse magnitudes of the penumbral shadow's polygons: its outer edge, then contours inside
+# it. They're drawn one over another in the same translucent color, so the shading deepens
+# toward the umbra in steps.
+PENUMBRAL_MAGNITUDES = (0.0, 0.25, 0.5, 0.75)
+
+# Triangle size Cesium tessellates the penumbral polygons into (radians; its default is 1
+# degree). Moving polygons are re-tessellated every frame and the penumbra is huge, so
+# coarser triangles matter for frame rate; edges between vertices are still subdivided at
+# this spacing, so the outline stays smooth.
+PENUMBRAL_GRANULARITY = math.radians(3)
+
+
+def _sampled_polygon(elements, cone, n_vertices, tolerance_km):
+    """The fields of one polygon of a compact sampled polygon for the shadow of cone (see
+    below), and the UTC (start, end) interval it's shown; (None, None) if it misses Earth."""
+    window = shadow_window(elements, cone)
     if window is None:
         return None, None
     start, end = window
-    samples = adaptive_samples(elements, start, end, n_vertices, tolerance_km=tolerance_km)
+    samples = adaptive_samples(elements, start, end, n_vertices, tolerance_km=tolerance_km, cone=cone)
 
     times = [round((t - start).total_seconds() * TIME_SCALE) for t, _ in samples]
     if any(b <= a for a, b in zip(times, times[1:])):
@@ -661,14 +721,8 @@ def umbral_shadow_compact(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=U
     lons = [[round(outline[i][0] * COORD_SCALE) for _, outline in samples] for i in range(n_vertices)]
     lats = [[round(outline[i][1] * COORD_SCALE) for _, outline in samples] for i in range(n_vertices)]
     return {
-        "format": SAMPLED_POLYGON_FORMAT,
-        "version": SAMPLED_POLYGON_VERSION,
-        "id": "umbral_shadow_%s" % iso,
-        "name": "EclipseTracks.org %s umbral shadow" % iso,
-        "vertex_id": "umbral_shadow_vertex_{i}_%s" % iso,  # {i} is the 2+ digit vertex index
         "availability": "%s/%s" % (_isotime(start), _isotime(end)),
         "epoch": _isotime(start),
-        "rgba": list(rgba),
         "time_scale": TIME_SCALE,
         "coord_scale": COORD_SCALE,
         "times": _deltas(times),
@@ -677,31 +731,103 @@ def umbral_shadow_compact(iso, elements, n_vertices=48, tolerance_km=0.5, rgba=U
     }, (start, end)
 
 
+def umbral_shadow_compact(iso, elements, n_vertices=48, tolerance_km=UMBRAL_TOLERANCE_KM,
+                          rgba=UMBRAL_SHADOW_RGBA):
+    """The umbral shadow as a compact sampled polygon (a JSON-serializable dict; version 1, a
+    single polygon), and the UTC (start, end) interval it's shown (see shadow_window);
+    (None, None) if it misses Earth.
+
+    Expanded (see expand_sampled_polygon), each vertex is a position-only packet with
+    time-sampled positions, and the polygon refers to those positions, so Cesium interpolates
+    every vertex between samples. Samples are adaptive (see adaptive_samples) and
+    interpolated linearly.
+    """
+    fields, window = _sampled_polygon(elements, UMBRA, n_vertices, tolerance_km)
+    if fields is None:
+        return None, None
+    return {
+        "format": SAMPLED_POLYGON_FORMAT,
+        "version": 1,
+        "id": "umbral_shadow_%s" % iso,
+        "name": "EclipseTracks.org %s umbral shadow" % iso,
+        "vertex_id": "umbral_shadow_vertex_{i}_%s" % iso,  # {i} is the 2+ digit vertex index
+        "availability": fields["availability"],
+        "epoch": fields["epoch"],
+        "rgba": list(rgba),
+        **fields,  # (keys already present keep their place)
+    }, window
+
+
+def penumbral_shadow_compact(iso, elements, magnitudes=PENUMBRAL_MAGNITUDES, n_vertices=48,
+                             tolerance_km=PENUMBRAL_TOLERANCE_KM, rgba=PENUMBRAL_SHADOW_RGBA,
+                             granularity=PENUMBRAL_GRANULARITY):
+    """The penumbral shadow as a compact sampled polygon document (version 2, several
+    polygons): one polygon per eclipse magnitude contour (see Cone) that reaches the Earth,
+    and the UTC (start, end) interval the outermost is shown; (None, None) if none does.
+
+    Magnitude 0 is the penumbra's outer edge; its polygon keeps the id penumbral_shadow_<iso>,
+    and the contours inside it are penumbral_shadow_m<percent>_<iso>.
+    """
+    polygons, window = [], None
+    for m in magnitudes:
+        fields, w = _sampled_polygon(elements, Cone(m), n_vertices, tolerance_km)
+        if fields is None:
+            continue
+        kind = "penumbral_shadow" if m == 0 else "penumbral_shadow_m%02d" % round(m * 100)
+        polygons.append({
+            "id": "%s_%s" % (kind, iso),
+            "name": ("Partial eclipse" if m == 0 else "Eclipse magnitude %d%%" % round(m * 100)),
+            "vertex_id": "%s_vertex_{i}_%s" % (kind, iso),
+            "rgba": list(rgba),
+            "granularity": granularity,
+            **fields,
+        })
+        window = w if window is None else (min(window[0], w[0]), max(window[1], w[1]))
+    if not polygons:
+        return None, None
+    return {
+        "format": SAMPLED_POLYGON_FORMAT,
+        "version": 2,
+        "name": "EclipseTracks.org %s penumbral shadow" % iso,
+        "polygons": polygons,
+    }, window
+
+
 def expand_sampled_polygon(compact):
     """CZML packets (a list of dicts, starting with the document packet, which has no clock)
-    for a compact sampled polygon. Reference implementation of sampled_polygon.js."""
-    if compact.get("format") != SAMPLED_POLYGON_FORMAT or compact.get("version") != SAMPLED_POLYGON_VERSION:
-        raise ValueError("Not a version %d sampled polygon" % SAMPLED_POLYGON_VERSION)
-    times = [t / compact["time_scale"] for t in _undeltas(compact["times"])]
-    scale = compact["coord_scale"]
+    for a compact sampled polygon: for each polygon, its vertices and then the polygon.
+    Reference implementation of sampled_polygon.js."""
+    if compact.get("format") != SAMPLED_POLYGON_FORMAT or compact.get("version") not in SAMPLED_POLYGON_VERSIONS:
+        raise ValueError("Not a version %s sampled polygon" % " or ".join(map(str, SAMPLED_POLYGON_VERSIONS)))
     packets = [{"id": "document", "version": CZML_VERSION, "name": compact["name"]}]
-    refs = []
-    for i, (lon_deltas, lat_deltas) in enumerate(zip(compact["lon"], compact["lat"])):
-        vertex_id = compact["vertex_id"].replace("{i}", "%02d" % i)
+    for polygon in (compact["polygons"] if compact["version"] == 2 else [compact]):
+        packets += _expand_polygon(polygon, named=compact["version"] == 2)
+    return packets
+
+
+def _expand_polygon(polygon, named):
+    times = [t / polygon["time_scale"] for t in _undeltas(polygon["times"])]
+    scale = polygon["coord_scale"]
+    packets, refs = [], []
+    for i, (lon_deltas, lat_deltas) in enumerate(zip(polygon["lon"], polygon["lat"])):
+        vertex_id = polygon["vertex_id"].replace("{i}", "%02d" % i)
         samples = []
         for t, lon, lat in zip(times, _undeltas(lon_deltas), _undeltas(lat_deltas)):
             samples += [t, lon / scale, lat / scale, 0]
         packets.append({
             "id": vertex_id,
-            "availability": compact["availability"],
-            "position": {"epoch": compact["epoch"], "cartographicDegrees": samples,
+            "availability": polygon["availability"],
+            "position": {"epoch": polygon["epoch"], "cartographicDegrees": samples,
                          "interpolationAlgorithm": "LINEAR"},
         })
         refs.append(vertex_id + "#position")
-    packets.append({
-        "id": compact["id"],
-        "availability": compact["availability"],
-        "polygon": {"show": True, "material": {"solidColor": {"color": {"rgba": compact["rgba"]}}},
-                    "positions": {"references": refs}},
-    })
+    packet = {"id": polygon["id"]}
+    if named and "name" in polygon:
+        packet["name"] = polygon["name"]
+    packet["availability"] = polygon["availability"]
+    packet["polygon"] = {"show": True, "material": {"solidColor": {"color": {"rgba": polygon["rgba"]}}}}
+    if "granularity" in polygon:
+        packet["polygon"]["granularity"] = polygon["granularity"]
+    packet["polygon"]["positions"] = {"references": refs}
+    packets.append(packet)
     return packets

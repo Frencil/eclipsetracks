@@ -5,8 +5,9 @@ import unittest
 
 from eclipsescraper import BesselianElements, EclipseTrack, beselm_url, parse_beselm_html
 from eclipsescraper.shadow import (
-    WGS84_A, axis_point, central_interval, shadow_boundary, shadow_interval, shadow_outline,
-    adaptive_samples, expand_sampled_polygon, shadow_window, umbral_shadow_compact,
+    PENUMBRA, WGS84_A, Cone, axis_point, central_interval, shadow_boundary, shadow_interval, shadow_outline,
+    adaptive_samples, expand_sampled_polygon, penumbral_shadow_compact, shadow_window,
+    umbral_shadow_compact,
 )
 
 from .test_eclipsescraper import read_fixture
@@ -223,6 +224,9 @@ class ShadowModelTestCase(unittest.TestCase):
         self.assertEqual(polygon['polygon']['positions']['references'],
                          [v['id'] + '#position' for v in vertices])
         self.assertEqual(polygon['polygon']['material']['solidColor']['color']['rgba'], [0, 0, 0, 160])
+        # Clamped to terrain (no height), at Cesium's default granularity
+        self.assertNotIn('height', polygon['polygon'])
+        self.assertNotIn('granularity', polygon['polygon'])
         samples = vertices[0]['position']['cartographicDegrees']
         times = samples[0::4]
         self.assertEqual(times[0], 0)
@@ -259,4 +263,93 @@ class ShadowModelTestCase(unittest.TestCase):
 
     def test_compact_rejects_unknown_format(self):
         with self.assertRaises(ValueError):
-            expand_sampled_polygon({**self.compact, 'version': 2})
+            expand_sampled_polygon({**self.compact, 'version': 3})
+
+
+class PenumbralShadowTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.elements = BesselianElements(parse_beselm_html(read_fixture('SE2027Feb06Abeselm.html')))
+        # Coarse, as for the umbra: structure is what's tested here
+        cls.compact, cls.interval = penumbral_shadow_compact(
+            '2027-02-06', cls.elements, n_vertices=12, tolerance_km=200)
+        cls.packets = expand_sampled_polygon(json.loads(json.dumps(cls.compact)))
+
+    # The penumbra is on the Earth from before the umbra arrives until after it leaves, and
+    # here a little beyond the elements' validity period, which the interval extends past
+    def test_interval(self):
+        umbra = shadow_window(self.elements)
+        start, end = self.interval
+        self.assertTrue(start < umbra[0] - datetime.timedelta(hours=1))
+        self.assertTrue(end > umbra[1] + datetime.timedelta(hours=1))
+        valid_start, valid_end = self.elements.valid_utc()
+        self.assertTrue(start < valid_start and end > valid_end)
+        one_second = datetime.timedelta(seconds=1)
+        p_start, p_end = shadow_interval(self.elements, cone=PENUMBRA)
+        self.assertIsNone(shadow_boundary(self.elements, p_start - one_second, cone=PENUMBRA))
+        self.assertIsNotNone(shadow_boundary(self.elements, p_start + one_second, cone=PENUMBRA))
+        self.assertIsNotNone(shadow_boundary(self.elements, p_end - one_second, cone=PENUMBRA))
+        self.assertIsNone(shadow_boundary(self.elements, p_end + one_second, cone=PENUMBRA))
+
+    # Much larger than the umbra and containing it: the umbra's axis point is inside
+    def test_contains_umbra(self):
+        t = self.elements.greatest_eclipse_ut
+        penumbra = [ecef_km(*p) for p in shadow_outline(self.elements, t, 48, cone=PENUMBRA)]
+        umbra = [ecef_km(*p) for p in shadow_outline(self.elements, t, 48)]
+        center = ecef_km(*axis_point(self.elements, t))
+        self.assertGreater(min(math.dist(center, p) for p in penumbra), 3000)
+        self.assertLess(max(math.dist(center, p) for p in umbra), 200)
+
+    # The magnitude contours are nested inside the penumbra, around the umbra
+    def test_contours_are_nested(self):
+        t = self.elements.greatest_eclipse_ut
+        center = ecef_km(*axis_point(self.elements, t))
+        radii = []
+        for m in (0.0, 0.25, 0.5, 0.75):
+            outline = [ecef_km(*p) for p in shadow_outline(self.elements, t, 48, cone=Cone(m))]
+            radii.append((min(math.dist(center, p) for p in outline), max(math.dist(center, p) for p in outline)))
+        for outer, inner in zip(radii, radii[1:]):
+            self.assertLess(inner[1], outer[0])
+        self.assertGreater(radii[-1][0], 200)  # still well outside the umbra
+
+    # Magnitude 1 is the umbra itself
+    def test_magnitude_one_is_umbra(self):
+        t = self.elements.greatest_eclipse_ut
+        umbra = [ecef_km(*p) for p in shadow_outline(self.elements, t, 48)]
+        for p in shadow_outline(self.elements, t, 48, cone=Cone(1.0)):
+            self.assertLess(km_to_polygon(ecef_km(*p), umbra), 0.5)
+
+    def test_shadow_packets(self):
+        self.assertEqual(self.compact['version'], 2)
+        self.assertEqual(self.packets[0], {'id': 'document', 'version': '1.1',
+                                           'name': 'EclipseTracks.org 2027-02-06 penumbral shadow'})
+        polygons = [p for p in self.packets if 'polygon' in p]
+        self.assertEqual([p['id'] for p in polygons], [
+            'penumbral_shadow_2027-02-06', 'penumbral_shadow_m25_2027-02-06',
+            'penumbral_shadow_m50_2027-02-06', 'penumbral_shadow_m75_2027-02-06'])
+        self.assertEqual([p['name'] for p in polygons], [
+            'Partial eclipse', 'Eclipse magnitude 25%', 'Eclipse magnitude 50%', 'Eclipse magnitude 75%'])
+        self.assertEqual(len(self.packets), 1 + 4 * 13)
+        for k, polygon in enumerate(polygons):
+            vertices = self.packets[1 + 13 * k:13 + 13 * k]
+            kind = polygon['id'][:-len('_2027-02-06')]
+            self.assertEqual(vertices[0]['id'], kind + '_vertex_00_2027-02-06')
+            self.assertEqual(polygon['polygon']['positions']['references'],
+                             [v['id'] + '#position' for v in vertices])
+            self.assertEqual(polygon['polygon']['material']['solidColor']['color']['rgba'], [0, 0, 0, 32])
+            self.assertNotIn('height', polygon['polygon'])
+            self.assertAlmostEqual(polygon['polygon']['granularity'], math.radians(3))
+            self.assertTrue(all(v['availability'] == polygon['availability'] for v in vertices))
+        # Inner contours are on the Earth for less time, within the outer edge's window
+        intervals = [p['availability'].split('/') for p in polygons]
+        for outer, inner in zip(intervals, intervals[1:]):
+            self.assertTrue(outer[0] < inner[0] and inner[1] < outer[1])
+        self.assertEqual(intervals[0], ['%sZ' % self.interval[0].strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3],
+                                        '%sZ' % self.interval[1].strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3]])
+
+    # The expanded packets are valid CZML (as czml3 understands it)
+    def test_expanded_is_czml(self):
+        from czml3 import Document, Packet
+        doc = json.loads(Document(packets=[Packet(**p) for p in self.packets]).dumps())
+        self.assertEqual(len(doc), len(self.packets))

@@ -193,10 +193,14 @@ class CommandLineTestCase(unittest.TestCase):
             self.assertEqual(main(['--czml-dir', str(tmp), '--cache-dir', str(tmp / 'cache'),
                                    '--elements-file', str(tmp / 'elements.json'),
                                    'czml', '--tracks-only']), 0)
-            self.assertTrue(json.loads((tmp / 'events.json').read_text())[0]['umbral_shadow'])
+            entry = json.loads((tmp / 'events.json').read_text())[0]
+            self.assertTrue(entry['umbral_shadow'])
+            self.assertTrue(entry['penumbral_shadow'])
+            # The clock covers the penumbra, which is on the Earth longer than the umbra
             doc = json.loads((tmp / '2027-02-06.umbral_track.czml').read_text())
-            self.assertEqual(doc[0]['clock']['interval'], '2027-02-06T14:03:53Z/2027-02-06T17:55:25Z')
+            self.assertEqual(doc[0]['clock']['interval'], '2027-02-06T12:57:35Z/2027-02-06T19:01:38Z')
             self.assertFalse((tmp / '2027-02-06.umbral_shadow.json').exists())
+            self.assertFalse((tmp / '2027-02-06.penumbral_shadow.json').exists())
 
     # Generating a subset of events updates their entries in events.json and keeps the rest,
     # in events.txt order; the bad flag comes from events.txt and unlisted events are dropped

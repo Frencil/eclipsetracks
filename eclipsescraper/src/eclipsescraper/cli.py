@@ -15,13 +15,21 @@ from pathlib import Path
 
 from .besselian import BesselianElements, beselm_url, parse_beselm_html
 from .common import DEFAULT_CACHE_DIR, DEFAULT_CZML_DIR, DEFAULT_ELEMENTS_FILE, download, read_cached, read_events
-from .shadow import shadow_window, umbral_shadow_compact
+from .shadow import PENUMBRA, UMBRA, penumbral_shadow_compact, shadow_window, umbral_shadow_compact
 from .track import EclipseTrack
 
-# Events that get the Besselian-modeled umbral shadow.
+# Events that get the Besselian-modeled umbral shadow
 def has_umbral_shadow(iso):
-    # return "2020" <= iso[:4] <= "2029"
     return True
+
+
+# Events that get the Besselian-modeled penumbral shadow. Pilot: the next upcoming event;
+# widen once it's been reviewed on the site.
+PENUMBRAL_SHADOW_EVENTS = {"2027-02-06"}
+
+
+def has_penumbral_shadow(iso):
+    return iso in PENUMBRAL_SHADOW_EVENTS
 
 
 # Per-event output files in the czml directory. Each component is its own CZML document so
@@ -30,9 +38,22 @@ def umbral_track_path(czml_dir, iso):
     return czml_dir / (iso + ".umbral_track.czml")
 
 
-# The umbral shadow is a compact sampled polygon (JSON) that the site expands into CZML
+# Shadows are compact sampled polygons (JSON) that the site expands into CZML
 def umbral_shadow_path(czml_dir, iso):
     return czml_dir / (iso + ".umbral_shadow.json")
+
+
+def penumbral_shadow_path(czml_dir, iso):
+    return czml_dir / (iso + ".penumbral_shadow.json")
+
+
+# Shadow components: (events.json key, whether an event has it, its file, its generator,
+# and the cone whose window it's shown for)
+SHADOWS = (
+    ("umbral_shadow", lambda iso: has_umbral_shadow(iso), umbral_shadow_path, umbral_shadow_compact, UMBRA),
+    ("penumbral_shadow", lambda iso: has_penumbral_shadow(iso), penumbral_shadow_path, penumbral_shadow_compact,
+     PENUMBRA),
+)
 
 
 # One index of every event for the site's navigation (and which components each has), so
@@ -120,8 +141,8 @@ def cmd_elements(args, events):
 
 def cmd_czml(args, events):
     """Generate CZML/JSON for events from cached path tables and the elements file: the
-    umbral track, and the umbral shadow (unless --tracks-only, which keeps existing shadow
-    files)."""
+    umbral track, and the umbral and penumbral shadows (unless --tracks-only, which keeps
+    existing shadow files)."""
     all_elements = load_elements(args.elements_file)
     index_file = events_index_path(args.czml_dir)
     index = load_events_index(index_file)
@@ -131,28 +152,35 @@ def cmd_czml(args, events):
         track.loadFromCache(url, args.cache_dir)
 
         written = []
-        window = None
-        shadow_file = umbral_shadow_path(args.czml_dir, iso)
-        if has_umbral_shadow(iso):
-            if iso not in all_elements:
-                raise Exception("No Besselian elements for %s; run `eclipsescraper elements %s`" % (iso, iso))
-            elements = BesselianElements(all_elements[iso])
-            if args.tracks_only:
-                window = shadow_window(elements)
-            else:
-                compact, window = umbral_shadow_compact(iso, elements)
-                if compact is not None:
-                    shadow_file.write_text(json.dumps(compact, separators=(",", ":")))
-                    written.append(shadow_file.name)
-        if window is None and shadow_file.exists():
-            shadow_file.unlink()
-            print("Removed " + shadow_file.name)
+        windows = []  # of every shadow, for the track's clock
+        flags = {}
+        for key, has_shadow, path, generate_shadow, cone in SHADOWS:
+            window = None
+            shadow_file = path(args.czml_dir, iso)
+            if has_shadow(iso):
+                if iso not in all_elements:
+                    raise Exception("No Besselian elements for %s; run `eclipsescraper elements %s`" % (iso, iso))
+                elements = BesselianElements(all_elements[iso])
+                if args.tracks_only:
+                    window = shadow_window(elements, cone)
+                else:
+                    compact, window = generate_shadow(iso, elements)
+                    if compact is not None:
+                        shadow_file.write_text(json.dumps(compact, separators=(",", ":")))
+                        written.append(shadow_file.name)
+            if window is None and shadow_file.exists():
+                shadow_file.unlink()
+                print("Removed " + shadow_file.name)
+            if window is not None:
+                windows.append(window)
+            flags[key] = window is not None
 
-        # The track's clock covers the shadow, since the shadow document has no clock
+        # The track's clock covers the shadows, since their documents have no clock
+        clock = (min(w[0] for w in windows), max(w[1] for w in windows)) if windows else None
         track_file = umbral_track_path(args.czml_dir, iso)
-        track_file.write_text(track.czml(extra_interval=window).dumps())
+        track_file.write_text(track.czml(extra_interval=clock).dumps())
         # The index entry tells the site which component documents to load
-        index[iso] = {**track.json(), "umbral_shadow": window is not None}
+        index[iso] = {**track.json(), **flags}
         print("Wrote " + ", ".join([track_file.name] + written))
 
     errors = _each(events, generate)
@@ -190,7 +218,7 @@ def main(argv=None):
                            help="Seconds to wait before each download (default: %(default)s)")
         if name == "czml":
             p.add_argument("--tracks-only", action="store_true",
-                           help="Skip (slow) umbral shadow generation, keeping existing shadow files")
+                           help="Skip (slow) shadow generation, keeping existing shadow files")
     args = parser.parse_args(argv)
 
     events = [e for e in read_events(args.czml_dir / "events.txt") if not args.isos or e[0] in args.isos]

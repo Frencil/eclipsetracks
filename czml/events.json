@@ -106,7 +106,7 @@
 {"iso": "2024-10-02", "type": "annular", "camera_position": [-114.322, -22.195, 10000000.0], "regions": ["north pacific", "south america", "south pacific"], "umbral_shadow": true},
 {"iso": "2026-02-17", "type": "annular", "camera_position": [86.725, -64.667, 10000000.0], "regions": ["antarctica", "indian ocean"], "umbral_shadow": true},
 {"iso": "2026-08-12", "type": "total", "camera_position": [-25.205, 65.172, 10000000.0], "regions": ["arctic", "europe", "north atlantic"], "umbral_shadow": true},
-{"iso": "2027-02-06", "type": "annular", "camera_position": [-47.855, -30.772, 10000000.0], "regions": ["north atlantic", "south america", "south atlantic", "south pacific"], "umbral_shadow": true},
+{"iso": "2027-02-06", "type": "annular", "camera_position": [-47.855, -30.772, 10000000.0], "regions": ["north atlantic", "south america", "south atlantic", "south pacific"], "umbral_shadow": true, "penumbral_shadow": true},
 {"iso": "2027-08-02", "type": "total", "camera_position": [32.98, 25.638, 10000000.0], "regions": ["europe", "indian ocean", "middle east", "north atlantic", "northern africa", "southeastern asia"], "umbral_shadow": true},
 {"iso": "2028-01-26", "type": "annular", "camera_position": [-51.517, 2.995, 10000000.0], "regions": ["europe", "north atlantic", "northern africa", "south america", "south pacific"], "umbral_shadow": true},
 {"iso": "2028-07-22", "type": "total", "camera_position": [126.867, -15.665, 10000000.0], "regions": ["australia / new zealand", "indian ocean"], "umbral_shadow": true},
